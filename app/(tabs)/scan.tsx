@@ -1,9 +1,8 @@
 import { Text, View } from "react-native";
-
-export default function Explore() {
+export default function Scan() {
   return (
     <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-      <Text style={{ fontSize: 24, fontWeight: "bold" }}>탐색</Text>
+      <Text>스캔</Text>
     </View>
   );
 }

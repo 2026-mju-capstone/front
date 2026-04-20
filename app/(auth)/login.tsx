@@ -1,24 +1,25 @@
 import { fonts } from "@/constants/typography";
-import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
+import { AlertCircle, Eye, EyeOff, Lock, Mail, X } from "lucide-react-native";
 import { useState } from "react";
 import {
-    ActivityIndicator,
-    Keyboard,
-    KeyboardAvoidingView,
-    Platform,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    TouchableWithoutFeedback,
-    View,
+  ActivityIndicator,
+  Keyboard,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  TouchableWithoutFeedback,
+  View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-const BASE_URL = "http://52.63.7.132:8080";
+const BASE_URL = process.env.EXPO_PUBLIC_BASE_URL ?? "http://52.63.7.132:8080";
+
+const isSchoolEmail = (email: string) =>
+  email.endsWith(".ac.kr") || email.endsWith(".edu");
 
 export default function LoginPage() {
   const router = useRouter();
@@ -31,8 +32,7 @@ export default function LoginPage() {
   const [emailError, setEmailError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  const isValid =
-    (email.endsWith(".ac.kr") || email.endsWith(".edu")) && password.length > 0;
+  const isValid = isSchoolEmail(email) && password.length > 0;
 
   const handleLogin = async () => {
     setError("");
@@ -40,7 +40,7 @@ export default function LoginPage() {
       setError("이메일을 입력해주세요.");
       return;
     }
-    if (!email.endsWith(".ac.kr") && !email.endsWith(".edu")) {
+    if (!isSchoolEmail(email)) {
       setError("학교 이메일(@*.ac.kr 또는 @*.edu)을 사용해주세요.");
       return;
     }
@@ -57,16 +57,26 @@ export default function LoginPage() {
         body: JSON.stringify({ schoolEmail: email, password }),
       });
 
+      if (!response.ok) {
+        setError("서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
+        return;
+      }
+
       const result = await response.json();
 
       if (result.success) {
+        Keyboard.dismiss();
         await AsyncStorage.setItem("token", result.data.token);
         router.replace("/(tabs)");
       } else {
         setError(result.error || "이메일 또는 비밀번호가 올바르지 않습니다.");
       }
     } catch (e) {
-      setError("서버 연결에 실패했습니다. 잠시 후 다시 시도해주세요.");
+      if (e instanceof TypeError) {
+        setError("네트워크 연결을 확인해주세요.");
+      } else {
+        setError("서버 연결에 실패했습니다. 잠시 후 다시 시도해주세요.");
+      }
     } finally {
       setIsLoading(false);
     }
@@ -74,7 +84,12 @@ export default function LoginPage() {
 
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-      <View style={[styles.container, { paddingTop: insets.top }]}>
+      <View
+        style={[
+          styles.container,
+          { paddingTop: insets.top, paddingBottom: insets.bottom + 8 },
+        ]}
+      >
         <View style={styles.topArea}>
           <View style={styles.logoRow}>
             <LinearGradient
@@ -83,23 +98,17 @@ export default function LoginPage() {
               end={{ x: 1, y: 1 }}
               style={styles.logoBox}
             >
-              <Ionicons name="search" size={22} color="#fff" />
+              <Mail size={20} color="#fff" />
             </LinearGradient>
             <Text style={styles.appName}>줍줍</Text>
           </View>
 
-          {/* 이메일 */}
           <View style={styles.inputWrapper}>
             <Text style={styles.label}>학교 이메일</Text>
             <View
               style={[styles.inputBox, emailError ? styles.inputError : null]}
             >
-              <Ionicons
-                name="mail-outline"
-                size={18}
-                color="#aaa"
-                style={styles.inputIcon}
-              />
+              <Mail size={18} color="#aaa" style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
                 placeholder="example@university.ac.kr"
@@ -111,11 +120,7 @@ export default function LoginPage() {
                   setEmailError("");
                 }}
                 onBlur={() => {
-                  if (
-                    email.length > 0 &&
-                    !email.endsWith(".ac.kr") &&
-                    !email.endsWith(".edu")
-                  ) {
+                  if (email.length > 0 && !isSchoolEmail(email)) {
                     setEmailError("학교 이메일 형식이 아닙니다.");
                   }
                 }}
@@ -132,19 +137,18 @@ export default function LoginPage() {
                     setError("");
                   }}
                 >
-                  <Ionicons name="close-circle" size={18} color="#ccc" />
+                  <X size={18} color="#ccc" />
                 </TouchableOpacity>
               )}
             </View>
             {emailError ? (
               <View style={styles.errorBox}>
-                <Ionicons name="warning-outline" size={13} color="#f87171" />
+                <AlertCircle size={13} color="#f87171" />
                 <Text style={styles.errorText}>{emailError}</Text>
               </View>
             ) : null}
           </View>
 
-          {/* 비밀번호 */}
           <View style={styles.inputWrapper}>
             <Text style={styles.label}>비밀번호</Text>
             <View
@@ -153,12 +157,7 @@ export default function LoginPage() {
                 error && !password ? styles.inputError : null,
               ]}
             >
-              <Ionicons
-                name="lock-closed-outline"
-                size={18}
-                color="#aaa"
-                style={styles.inputIcon}
-              />
+              <Lock size={18} color="#aaa" style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
                 placeholder="비밀번호를 입력하세요"
@@ -169,13 +168,15 @@ export default function LoginPage() {
                   setError("");
                 }}
                 secureTextEntry={!showPassword}
+                textContentType="oneTimeCode"
+                autoComplete="off"
               />
               <TouchableOpacity onPress={() => setShowPassword((v) => !v)}>
-                <Ionicons
-                  name={showPassword ? "eye-off-outline" : "eye-outline"}
-                  size={20}
-                  color="#ccc"
-                />
+                {showPassword ? (
+                  <EyeOff size={20} color="#ccc" />
+                ) : (
+                  <Eye size={20} color="#ccc" />
+                )}
               </TouchableOpacity>
               {password.length > 0 && (
                 <TouchableOpacity
@@ -185,7 +186,7 @@ export default function LoginPage() {
                   }}
                   style={{ marginLeft: 8 }}
                 >
-                  <Ionicons name="close-circle" size={18} color="#ccc" />
+                  <X size={18} color="#ccc" />
                 </TouchableOpacity>
               )}
             </View>
@@ -193,32 +194,13 @@ export default function LoginPage() {
 
           {error ? (
             <View style={styles.errorBox}>
-              <Ionicons name="warning-outline" size={13} color="#f87171" />
+              <AlertCircle size={13} color="#f87171" />
               <Text style={styles.errorText}>{error}</Text>
             </View>
           ) : null}
 
-          <View style={styles.linkRow}>
-            <TouchableOpacity>
-              <Text style={styles.linkText}>비밀번호를 잊으셨나요?</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => router.push("/(auth)/signup/email")}
-            >
-              <Text style={styles.linkTextBold}>회원가입</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        <KeyboardAvoidingView
-          behavior="padding"
-          keyboardVerticalOffset={
-            Platform.OS === "ios" ? insets.bottom - 60 : 0
-          }
-        >
-          <View
-            style={[styles.bottomArea, { paddingBottom: insets.bottom + 8 }]}
-          >
+          {/* 로그인 버튼 - 폼 바로 아래 */}
+          <View style={styles.buttonWrapper}>
             <TouchableOpacity
               onPress={handleLogin}
               disabled={!isValid || isLoading}
@@ -255,7 +237,33 @@ export default function LoginPage() {
               )}
             </TouchableOpacity>
           </View>
-        </KeyboardAvoidingView>
+
+          <View style={styles.linkRow}>
+            <TouchableOpacity>
+              <Text style={styles.linkText}>아이디/비밀번호 찾기</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => router.push("/(auth)/signup/email")}
+            >
+              <Text style={styles.linkTextBold}>회원가입</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* 하단 약관 - flex로 자연스럽게 밀림 */}
+        <View style={styles.termsRow}>
+          <TouchableOpacity>
+            <Text style={styles.termsText}>이용약관</Text>
+          </TouchableOpacity>
+          <Text style={styles.termsDivider}>·</Text>
+          <TouchableOpacity>
+            <Text style={styles.termsText}>개인정보 처리방침</Text>
+          </TouchableOpacity>
+          <Text style={styles.termsDivider}>·</Text>
+          <TouchableOpacity>
+            <Text style={styles.termsText}>문의하기</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </TouchableWithoutFeedback>
   );
@@ -321,7 +329,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: "#222",
     fontFamily: fonts.regular,
-    letterSpacing: 0,
     height: "100%",
     paddingVertical: 0,
     textAlignVertical: "center",
@@ -338,23 +345,9 @@ const styles = StyleSheet.create({
     color: "#f87171",
     fontFamily: fonts.regular,
   },
-  linkRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 8,
-  },
-  linkText: {
-    fontSize: 13,
-    color: "#aaa",
-    fontFamily: fonts.regular,
-  },
-  linkTextBold: {
-    fontSize: 13,
-    color: "#4F6EF7",
-    fontFamily: fonts.bold,
-  },
-  bottomArea: {
-    paddingTop: 0,
+  buttonWrapper: {
+    marginTop: 24,
+    marginBottom: 16,
   },
   loginButtonWrapper: {
     borderRadius: 14,
@@ -379,5 +372,35 @@ const styles = StyleSheet.create({
   },
   loginButtonTextInactive: {
     color: "#aaa",
+  },
+  linkRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  linkText: {
+    fontSize: 13,
+    color: "#aaa",
+    fontFamily: fonts.regular,
+  },
+  linkTextBold: {
+    fontSize: 13,
+    color: "#4F6EF7",
+    fontFamily: fonts.bold,
+  },
+  termsRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 6,
+    paddingBottom: 8,
+  },
+  termsText: {
+    fontSize: 12,
+    color: "#aaa",
+    fontFamily: fonts.regular,
+  },
+  termsDivider: {
+    fontSize: 12,
+    color: "#ddd",
   },
 });
