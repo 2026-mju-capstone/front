@@ -15,8 +15,8 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-
-const BASE_URL = process.env.EXPO_PUBLIC_BASE_URL ?? "http://52.63.7.132:8080";
+import { getFCMToken, sendTokenToServer } from '@/hooks/use-notifications';
+import { LOGIN_URL } from "@/constants/url";
 
 const isSchoolEmail = (email: string) =>
   email.endsWith(".ac.kr") || email.endsWith(".edu");
@@ -51,7 +51,7 @@ export default function LoginPage() {
 
     setIsLoading(true);
     try {
-      const response = await fetch(`${BASE_URL}/api/auth/login`, {
+      const response = await fetch(LOGIN_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ schoolEmail: email, password }),
@@ -66,8 +66,11 @@ export default function LoginPage() {
 
       if (result.success) {
         Keyboard.dismiss();
-        await AsyncStorage.setItem("token", result.data.token);
-        router.replace("/(tabs)");
+        await AsyncStorage.setItem("token", result.data.accessToken);
+        await getFCMToken(sendTokenToServer);
+        requestAnimationFrame(() => {
+          router.replace('/(tabs)');
+        });
       } else {
         setError(result.error || "이메일 또는 비밀번호가 올바르지 않습니다.");
       }

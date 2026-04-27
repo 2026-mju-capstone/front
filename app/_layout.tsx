@@ -1,24 +1,23 @@
-import { useColorScheme } from "@/hooks/use-color-scheme";
-import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import {
-  DarkTheme,
-  DefaultTheme,
-  ThemeProvider,
-} from "@react-navigation/native";
-import { useFonts } from "expo-font";
-import { Stack, useRouter } from "expo-router";
-import * as SplashScreen from "expo-splash-screen";
-import { StatusBar } from "expo-status-bar";
-import { useEffect } from "react";
-import { GestureHandlerRootView } from "react-native-gesture-handler";
-import "react-native-reanimated";
-import { SafeAreaProvider } from "react-native-safe-area-context";
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
+import { useFonts } from 'expo-font';
+import { Stack, useRouter } from 'expo-router';
+import * as SplashScreen from 'expo-splash-screen';
+import { StatusBar } from 'expo-status-bar';
+import { useEffect } from 'react';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import 'react-native-reanimated';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { getFCMToken, sendTokenToServer, useNotifications } from '@/hooks/use-notifications';
 import "../global.css";
+import { validateAccessToken } from '@/utils/api';
 
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
+  useNotifications();
   const colorScheme = useColorScheme();
   const router = useRouter();
   const [fontsLoaded] = useFonts({
@@ -36,8 +35,10 @@ export default function RootLayout() {
 
   const checkToken = async () => {
     try {
+      await validateAccessToken();
       const token = await AsyncStorage.getItem("token");
       if (token) {
+        await getFCMToken(sendTokenToServer);
         router.replace("/(tabs)");
       } else {
         router.replace("/(auth)/login");
