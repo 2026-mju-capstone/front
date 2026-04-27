@@ -6,8 +6,11 @@ import {
   MessageCircle,
   QrCode,
 } from "lucide-react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function TabLayout() {
+  const insets = useSafeAreaInsets();
+
   return (
     <Tabs
       screenOptions={{
@@ -18,8 +21,8 @@ export default function TabLayout() {
           borderTopWidth: 1,
           borderTopColor: "#f0f0f0",
           backgroundColor: "#fff",
-          height: 95,
-          paddingBottom: 16,
+          height: 60 + insets.bottom,
+          paddingBottom: insets.bottom,
           paddingTop: 8,
         },
         tabBarLabelStyle: {
@@ -27,7 +30,7 @@ export default function TabLayout() {
           fontFamily: "Pretendard-Medium",
         },
         tabBarIconStyle: {
-          marginBottom: 4,
+          marginBottom: 2,
         },
       }}
     >
