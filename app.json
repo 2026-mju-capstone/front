@@ -21,7 +21,7 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.lalaalal.ash",
+      "package": "com.zoopick.android",
       "googleServicesFile": "./google-services.json"
     },
     "web": {
