@@ -3,11 +3,11 @@ import AsyncStorage from "@react-native-async-storage/async-storage"
 
 export type RequestCallback = (response: Response) => void;
 
-export const sendSessionRequest = async (url: string, body: string, callback: RequestCallback) => {
+export const sendAccessRequest = async (url: string, body: string, callback: RequestCallback) => {
     const token: string | null = await AsyncStorage.getItem('token');
 
     if (!token)
-        console.error('Session token is not stored');
+        console.error('Access token is not stored');
 
     const response: Response = await fetch(url, {
         method: 'POST',
@@ -31,11 +31,11 @@ export const sendAnonymousRequest = async (url: string, body: string, callback: 
     callback(response);
 }
 
-export const validateSessionToken = async () => {
+export const validateAccessToken = async () => {
     const token: string | null = await AsyncStorage.getItem('token');
     if (!token)
         return;
-    await sendSessionRequest(VALIDATION_URL, "", async (response: Response) => {
+    await sendAccessRequest(VALIDATION_URL, "", async (response: Response) => {
         if (response.ok) {
             const result = await response.json();
             AsyncStorage.setItem('token', result.data);

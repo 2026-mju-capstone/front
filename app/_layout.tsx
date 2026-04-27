@@ -12,7 +12,7 @@ import 'react-native-reanimated';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { getFCMToken, sendTokenToServer, useNotifications } from '@/hooks/use-notifications';
 import "../global.css";
-import { validateSessionToken } from '@/utils/api';
+import { validateAccessToken } from '@/utils/api';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -35,7 +35,7 @@ export default function RootLayout() {
 
   const checkToken = async () => {
     try {
-      await validateSessionToken();
+      await validateAccessToken();
       const token = await AsyncStorage.getItem("token");
       if (token) {
         await getFCMToken(sendTokenToServer);

@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { Platform, PermissionsAndroid } from 'react-native';
 import messaging, { RemoteMessage } from '@react-native-firebase/messaging';
 import { REGISTER_URL } from '@/constants/url';
-import { sendSessionRequest } from '@/utils/api';
+import { sendAccessRequest } from '@/utils/api';
 
 
 export type TokenCallback = (token: string) => void;
@@ -24,7 +24,7 @@ export const getFCMToken = async (callback: TokenCallback) => {
 
 export const sendTokenToServer: TokenCallback = async (token: string) => {
     try {
-        sendSessionRequest(REGISTER_URL, JSON.stringify({ token: token }), (response: Response) => {
+        sendAccessRequest(REGISTER_URL, JSON.stringify({ token: token }), (response: Response) => {
             if (!response.ok)
                 console.error(`Failed to register token: ${response.status}`);
         });
