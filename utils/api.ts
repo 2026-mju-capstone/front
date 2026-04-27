@@ -35,7 +35,7 @@ export const validateSessionToken = async () => {
     const token: string | null = await AsyncStorage.getItem('token');
     if (!token)
         return;
-    sendSessionRequest(VALIDATION_URL, "", async (response: Response) => {
+    await sendSessionRequest(VALIDATION_URL, "", async (response: Response) => {
         if (response.ok) {
             const result = await response.json();
             AsyncStorage.setItem('token', result.data);

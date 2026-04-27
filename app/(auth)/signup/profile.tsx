@@ -91,7 +91,9 @@ export default function ProfilePage() {
       });
       const result = await response.json();
       if (result.success) {
-        router.replace("/(tabs)");
+        requestAnimationFrame(() => {
+          router.replace("/(tabs)");
+        });
       } else {
         setErrors({ nickname: result.error || "회원가입에 실패했습니다." });
       }

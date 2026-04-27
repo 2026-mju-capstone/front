@@ -68,7 +68,9 @@ export default function LoginPage() {
         Keyboard.dismiss();
         await AsyncStorage.setItem("token", result.data.accessToken);
         await getFCMToken(sendTokenToServer);
-        router.replace("/(tabs)");
+        requestAnimationFrame(() => {
+          router.replace('/(tabs)');
+        });
       } else {
         setError(result.error || "이메일 또는 비밀번호가 올바르지 않습니다.");
       }
