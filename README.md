@@ -16,6 +16,12 @@ This is an [Expo](https://expo.dev) project created with [`create-expo-app`](htt
    npx expo start
    ```
 
+3. Connect adb
+
+4. Start android **(Environment Variable ANDROID_HOME must be set)**
+   ```bash
+   npx expo run:android
+   ```
 In the output, you'll find options to open the app in a
 
 - [development build](https://docs.expo.dev/develop/development-builds/introduction/)
@@ -24,6 +30,15 @@ In the output, you'll find options to open the app in a
 - [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
 
 You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+
+## Environment example
+```bash .env
+# Mandatory
+ANDROID_HOME=/path/to/android/sdk
+
+# Optional
+EXPO_PUBLIC_BASE_URL=http://localhost:8080
+```
 
 ## Get a fresh project
 
