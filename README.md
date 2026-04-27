@@ -1,65 +1,88 @@
-# Welcome to your Expo app 👋
+# 프런트 개발환경 세팅 가이드
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+> iOS / Android 공통 가이드입니다. 윈도우/맥 모두 동일하게 세팅하면 됩니다.
+> 
 
-## Get started
+---
 
-1. Install dependencies
+## 🛠 사전 준비
 
-   ```bash
-   npm install
-   ```
+### 1. Node.js 설치
 
-2. Start the app
+👉 https://nodejs.org 에서 **LTS 버전** 다운로드 후 설치
 
-   ```bash
-   npx expo start
-   ```
+설치 확인:
 
-3. Connect adb
-
-4. Start android **(Environment Variable ANDROID_HOME must be set)**
-   ```bash
-   npx expo run:android
-   ```
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Environment example
-```bash .env
-# Mandatory
-ANDROID_HOME=/path/to/android/sdk
-
-# Optional
-EXPO_PUBLIC_BASE_URL=http://localhost:8080
+```
+node -v
 ```
 
-## Get a fresh project
+`v24.14.1` 이상이면 OK
 
-When you're ready, run:
+### 2. Expo Go 앱 설치
 
-```bash
-npm run reset-project
+- 아이폰 → App Store에서 **Expo Go** 검색 후 설치
+- 안드로이드 → Play Store에서 **Expo Go** 검색 후 설치
+
+---
+
+## 🚀 시작하기
+
+### 1단계 — 레포 클론
+
+```
+git clone https://github.com/2026-mju-capstone/front.git
+cd front
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+### 2단계 — 패키지 설치
 
-## Learn more
+```
+npm install
+```
 
-To learn more about developing your project with Expo, look at the following resources:
+### 3단계 — 환경변수 설정
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+프로젝트 루트(최상위 폴더)에 `.env` 파일을 직접 만들어야 합니다.
 
-## Join the community
+**1. 프로젝트 최상위 폴더로 이동**
 
-Join our community of developers creating universal apps.
+`CapD` 폴더 안에 `app`, `assets`, `components` 등이 있는 위치입니다.
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+**2. `.env` 파일 생성**
+
+VSCode / 커서 사용 중이라면 → 왼쪽 파일 트리에서 `CapD` 폴더 우클릭 → `New File` → 파일 이름을 `.env` 로 입력
+
+**3. 아래 내용 붙여넣기**
+
+```
+EXPO_PUBLIC_BASE_URL=http://52.63.7.132:8080
+```
+
+**4. 저장 (Ctrl+S / Cmd+S)**
+
+> ⚠️ 파일 이름이 반드시 `.env` 여야 합니다. `.env.txt` 로 저장되지 않도록 주의하세요!
+⚠️ 이 파일은 git에 올라가지 않습니다.
+> 
+
+### 4단계 — 실행
+
+```
+npx expo start
+```
+
+터미널에 QR 코드가 뜨면:
+
+- **아이폰** → 기본 카메라 앱으로 QR 코드 스캔
+- **안드로이드** → Expo Go 앱 열고 QR 코드 스캔
+
+> ⚠️ 개발 PC랑 폰이 **같은 와이파이**에 연결되어 있어야 합니다!
+> 
+
+---
+
+## ❗ 주의사항
+
+- `npm install` 후 오류가 나면 `npx expo install` 한 번 더 실행해보세요.
+- 반드시 PC랑 폰이 **같은 와이파이**에 연결되어 있어야 합니다.
+- 학교 와이파이처럼 기기 간 통신이 막혀있는 환경에서는 안 될 수 있습니다. 그럴 땐 핫스팟으로 연결해보세요.
