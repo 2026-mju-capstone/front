@@ -7,8 +7,7 @@ import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Keyboard, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useSignup } from "./_layout";
-
-const BASE_URL = "http://52.63.7.132:8080";
+import { VERIFY_URL } from "@/constants/url";
 
 export default function VerifyStep() {
   const { data, updateData } = useSignup();
@@ -68,7 +67,7 @@ export default function VerifyStep() {
     }
     setIsVerifying(true);
     try {
-      const response = await fetch(`${BASE_URL}/api/auth/verify`, {
+      const response = await fetch(VERIFY_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: data.email, certificationNumber: data.verifyCode }),

@@ -8,8 +8,7 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Keyboard, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useSignup } from "./_layout";
-
-const BASE_URL = "http://52.63.7.132:8080";
+import { SIGNUP_URL } from "@/constants/url";
 
 const DEPARTMENTS = [
   "화학전공", "에너지공학전공", "식품영양학전공", "생명과학정보학전공",
@@ -81,7 +80,7 @@ export default function ProfilePage() {
     if (Object.keys(e).length > 0) { setErrors(e); return; }
     setIsLoading(true);
     try {
-      const response = await fetch(`${BASE_URL}/api/auth/signup`, {
+      const response = await fetch(SIGNUP_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
