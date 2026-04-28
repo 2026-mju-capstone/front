@@ -42,17 +42,14 @@ export default function RootLayout() {
 
   const checkToken = async () => {
     try {
-      // 개발 중 임시 - 항상 탭으로 이동
-      router.replace("/(tabs)/map");
-      return;
-
-      // 아래는 나중에 다시 활성화
-      // const token = await AsyncStorage.getItem("token");
-      // if (token) {
-      //   router.replace("/(tabs)");
-      // } else {
-      //   router.replace("/(auth)/login");
-      // }
+      await validateAccessToken();
+      const token = await AsyncStorage.getItem("token");
+      if (token) {
+        await getFCMToken(sendTokenToServer);
+        router.replace("/(tabs)");
+      } else {
+        router.replace("/(auth)/login");
+      }
     } catch (e) {
       router.replace("/(auth)/login");
     }
