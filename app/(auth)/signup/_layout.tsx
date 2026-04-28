@@ -8,6 +8,7 @@ export type SignupData = {
   confirmPassword: string;
   nickname: string;
   department: string;
+  grade: string;
   profileImage?: string;
 };
 
@@ -32,6 +33,7 @@ export default function SignupLayout() {
     confirmPassword: "",
     nickname: "",
     department: "",
+    grade: "",
     profileImage: undefined,
   });
 
@@ -43,6 +45,7 @@ export default function SignupLayout() {
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="email" />
         <Stack.Screen name="verify" />
+        <Stack.Screen name="password" />
         <Stack.Screen name="profile" />
       </Stack>
     </SignupContext.Provider>

@@ -1,4 +1,5 @@
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useNotifications } from "@/hooks/use-notifications";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import {
   DarkTheme,
@@ -8,7 +9,7 @@ import {
 import { Camera } from "expo-camera";
 import { useFonts } from "expo-font";
 import * as Location from "expo-location";
-import { Stack, useRouter } from "expo-router";
+import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
@@ -20,8 +21,8 @@ import "../global.css";
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
+  useNotifications();
   const colorScheme = useColorScheme();
-  const router = useRouter();
   const [fontsLoaded] = useFonts({
     "Pretendard-Regular": require("../assets/fonts/Pretendard-Regular.otf"),
     "Pretendard-Medium": require("../assets/fonts/Pretendard-Medium.otf"),
@@ -32,28 +33,11 @@ export default function RootLayout() {
     (async () => {
       await Location.requestForegroundPermissionsAsync();
       await Camera.requestCameraPermissionsAsync();
-
       if (fontsLoaded) {
         SplashScreen.hideAsync();
-        checkToken();
       }
     })();
   }, [fontsLoaded]);
-
-  const checkToken = async () => {
-    try {
-      await validateAccessToken();
-      const token = await AsyncStorage.getItem("token");
-      if (token) {
-        await getFCMToken(sendTokenToServer);
-        router.replace("/(tabs)");
-      } else {
-        router.replace("/(auth)/login");
-      }
-    } catch (e) {
-      router.replace("/(auth)/login");
-    }
-  };
 
   if (!fontsLoaded) return null;
 
@@ -65,6 +49,7 @@ export default function RootLayout() {
             value={colorScheme === "dark" ? DarkTheme : DefaultTheme}
           >
             <Stack>
+              <Stack.Screen name="index" options={{ headerShown: false }} />
               <Stack.Screen name="(auth)" options={{ headerShown: false }} />
               <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
               <Stack.Screen name="loading" options={{ headerShown: false }} />

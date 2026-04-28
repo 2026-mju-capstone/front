@@ -1,4 +1,6 @@
 import { fonts } from "@/constants/typography";
+import { LOGIN_URL } from "@/constants/url";
+import { getFCMToken, sendTokenToServer } from "@/hooks/use-notifications";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
@@ -15,8 +17,6 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-
-const BASE_URL = process.env.EXPO_PUBLIC_BASE_URL ?? "http://52.63.7.132:8080";
 
 const isSchoolEmail = (email: string) =>
   email.endsWith(".ac.kr") || email.endsWith(".edu");
@@ -51,7 +51,7 @@ export default function LoginPage() {
 
     setIsLoading(true);
     try {
-      const response = await fetch(`${BASE_URL}/api/auth/login`, {
+      const response = await fetch(LOGIN_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ schoolEmail: email, password }),
@@ -60,8 +60,6 @@ export default function LoginPage() {
       if (!response.ok) {
         const errBody = await response.json().catch(() => null);
         console.log("status:", response.status, "body:", errBody);
-
-        // 상태코드별로 메시지 분리
         if (response.status === 401) {
           setError("이메일 또는 비밀번호가 올바르지 않습니다.");
         } else if (response.status >= 500) {
@@ -76,8 +74,11 @@ export default function LoginPage() {
 
       if (result.success) {
         Keyboard.dismiss();
-        await AsyncStorage.setItem("token", result.data.token);
-        router.replace("/(tabs)");
+        await AsyncStorage.setItem("token", result.data.accessToken);
+        await getFCMToken(sendTokenToServer);
+        requestAnimationFrame(() => {
+          router.replace("/(tabs)/map");
+        });
       } else {
         setError(result.error || "이메일 또는 비밀번호가 올바르지 않습니다.");
       }
@@ -209,7 +210,6 @@ export default function LoginPage() {
             </View>
           ) : null}
 
-          {/* 로그인 버튼 - 폼 바로 아래 */}
           <View style={styles.buttonWrapper}>
             <TouchableOpacity
               onPress={handleLogin}
@@ -260,7 +260,6 @@ export default function LoginPage() {
           </View>
         </View>
 
-        {/* 하단 약관 - flex로 자연스럽게 밀림 */}
         <View style={styles.termsRow}>
           <TouchableOpacity>
             <Text style={styles.termsText}>이용약관</Text>
@@ -280,16 +279,8 @@ export default function LoginPage() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#fff",
-    paddingHorizontal: 28,
-  },
-  topArea: {
-    flex: 1,
-    justifyContent: "flex-start",
-    paddingTop: 50,
-  },
+  container: { flex: 1, backgroundColor: "#fff", paddingHorizontal: 28 },
+  topArea: { flex: 1, justifyContent: "flex-start", paddingTop: 50 },
   logoRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -309,9 +300,7 @@ const styles = StyleSheet.create({
     color: "#111",
     fontFamily: fonts.bold,
   },
-  inputWrapper: {
-    marginBottom: 13,
-  },
+  inputWrapper: { marginBottom: 13 },
   label: {
     fontSize: 13,
     color: "#666",
@@ -331,9 +320,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: "#f87171",
   },
-  inputIcon: {
-    marginRight: 10,
-  },
+  inputIcon: { marginRight: 10 },
   input: {
     flex: 1,
     fontSize: 15,
@@ -350,53 +337,22 @@ const styles = StyleSheet.create({
     gap: 5,
     marginTop: 6,
   },
-  errorText: {
-    fontSize: 13,
-    color: "#f87171",
-    fontFamily: fonts.regular,
-  },
-  buttonWrapper: {
-    marginTop: 24,
-    marginBottom: 16,
-  },
-  loginButtonWrapper: {
-    borderRadius: 14,
-    overflow: "hidden",
-  },
-  loginButton: {
-    height: 58,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  loginButtonInactive: {
-    backgroundColor: "#e5e5e5",
-  },
-  disabledButton: {
-    opacity: 0.6,
-  },
+  errorText: { fontSize: 13, color: "#f87171", fontFamily: fonts.regular },
+  buttonWrapper: { marginTop: 24, marginBottom: 16 },
+  loginButtonWrapper: { borderRadius: 14, overflow: "hidden" },
+  loginButton: { height: 58, alignItems: "center", justifyContent: "center" },
+  loginButtonInactive: { backgroundColor: "#e5e5e5" },
+  disabledButton: { opacity: 0.6 },
   loginButtonText: {
     fontWeight: "700",
     fontSize: 16,
     fontFamily: fonts.bold,
     color: "#fff",
   },
-  loginButtonTextInactive: {
-    color: "#aaa",
-  },
-  linkRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  linkText: {
-    fontSize: 13,
-    color: "#aaa",
-    fontFamily: fonts.regular,
-  },
-  linkTextBold: {
-    fontSize: 13,
-    color: "#4F6EF7",
-    fontFamily: fonts.bold,
-  },
+  loginButtonTextInactive: { color: "#aaa" },
+  linkRow: { flexDirection: "row", justifyContent: "space-between" },
+  linkText: { fontSize: 13, color: "#aaa", fontFamily: fonts.regular },
+  linkTextBold: { fontSize: 13, color: "#4F6EF7", fontFamily: fonts.bold },
   termsRow: {
     flexDirection: "row",
     justifyContent: "center",
@@ -404,13 +360,6 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingBottom: 8,
   },
-  termsText: {
-    fontSize: 12,
-    color: "#aaa",
-    fontFamily: fonts.regular,
-  },
-  termsDivider: {
-    fontSize: 12,
-    color: "#ddd",
-  },
+  termsText: { fontSize: 12, color: "#aaa", fontFamily: fonts.regular },
+  termsDivider: { fontSize: 12, color: "#ddd" },
 });
