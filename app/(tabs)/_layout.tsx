@@ -35,7 +35,7 @@ export default function TabLayout() {
       }}
     >
       <Tabs.Screen
-        name="index"
+        name="map"
         options={{
           title: "지도",
           tabBarIcon: ({ color }) => <Map size={20} color={color} />,
