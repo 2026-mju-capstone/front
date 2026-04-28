@@ -6,9 +6,7 @@ import {
   DefaultTheme,
   ThemeProvider,
 } from "@react-navigation/native";
-import { Camera } from "expo-camera";
 import { useFonts } from "expo-font";
-import * as Location from "expo-location";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
@@ -30,13 +28,9 @@ export default function RootLayout() {
   });
 
   useEffect(() => {
-    (async () => {
-      await Location.requestForegroundPermissionsAsync();
-      await Camera.requestCameraPermissionsAsync();
-      if (fontsLoaded) {
-        SplashScreen.hideAsync();
-      }
-    })();
+    if (fontsLoaded) {
+      SplashScreen.hideAsync();
+    }
   }, [fontsLoaded]);
 
   if (!fontsLoaded) return null;

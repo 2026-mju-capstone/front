@@ -191,6 +191,7 @@ export default function MapScreen() {
   useEffect(() => {
     let subscription: Location.LocationSubscription | null = null;
     (async () => {
+      await Location.requestForegroundPermissionsAsync();
       const location = await Location.getCurrentPositionAsync({});
       setUserLocation({
         lat: location.coords.latitude,
@@ -392,7 +393,7 @@ export default function MapScreen() {
         }
       } else if (data.type === "MAP_CLICK") {
         Keyboard.dismiss();
-        bottomSheetRef.current?.snapToIndex(-1);
+        bottomSheetRef.current?.close();
         setSelectedBuilding(null);
       }
     } catch (e) {}

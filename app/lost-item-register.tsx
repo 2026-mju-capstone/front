@@ -1,5 +1,7 @@
+import { Camera } from "expo-camera";
 import { useRouter } from "expo-router";
 import { ArrowLeft } from "lucide-react-native";
+import { useEffect } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { fonts } from "../constants/typography";
@@ -7,6 +9,12 @@ import { fonts } from "../constants/typography";
 export default function LostItemRegister() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+
+  useEffect(() => {
+    (async () => {
+      await Camera.requestCameraPermissionsAsync();
+    })();
+  }, []);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>

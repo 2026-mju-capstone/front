@@ -1,5 +1,4 @@
 import { fonts } from "@/constants/typography";
-import { getFCMToken, sendTokenToServer } from "@/hooks/use-notifications";
 import { validateAccessToken } from "@/utils/api";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { LinearGradient } from "expo-linear-gradient";
@@ -17,7 +16,6 @@ export default function LoadingScreen() {
         await validateAccessToken();
         const token = await AsyncStorage.getItem("token");
         if (token) {
-          await getFCMToken(sendTokenToServer);
           router.replace("/(tabs)/map");
         } else {
           router.replace("/(auth)/login");
