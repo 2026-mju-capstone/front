@@ -185,7 +185,7 @@ export default function VerifyStep() {
           >
             {isCodeValid ? (
               <LinearGradient
-                colors={["#4F6EF7", "#6C8BFF"]}
+                colors={["#6366f1", "#818cf8"]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={[styles.button, isVerifying && styles.disabledButton]}

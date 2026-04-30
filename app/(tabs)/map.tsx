@@ -50,102 +50,25 @@ const BUILDINGS: Building[] = [
   },
   {
     id: 2,
-    name: "제2공학관",
+    name: "제5공학관",
     lat: 37.221724937276406,
     lng: 127.18665371173557,
     items: [],
   },
-  { id: 3, name: "제3공학관", lat: 37.2157, lng: 127.1827, items: [] },
-  { id: 4, name: "제4공학관", lat: 37.2157, lng: 127.1827, items: [] },
+  { id: 3, name: "함박관", lat: 37.2157, lng: 127.1827, items: [] },
+  { id: 4, name: "차세대과학관", lat: 37.2157, lng: 127.1827, items: [] },
   {
     id: 5,
-    name: "제5공학관",
+    name: "창조예술관",
     lat: 37.222083935325806,
     lng: 127.18755316511282,
     items: [],
   },
-  { id: 6, name: "명진당", lat: 37.2219, lng: 127.1889, items: [] },
-  { id: 7, name: "함박관", lat: 37.2218, lng: 127.1889, items: [] },
-  {
-    id: 8,
-    name: "학생회관",
-    lat: 37.22347653798419,
-    lng: 127.18724675644056,
-    items: [],
-  },
-  {
-    id: 9,
-    name: "채플관",
-    lat: 37.22395225229964,
-    lng: 127.18698596085319,
-    items: [],
-  },
-  { id: 10, name: "창조예술관", lat: 37.2235, lng: 127.1908, items: [] },
-  { id: 11, name: "체육관", lat: 37.2224, lng: 127.1932, items: [] },
-  { id: 12, name: "디자인관", lat: 37.2187, lng: 127.1853, items: [] },
-  { id: 13, name: "방목기념관", lat: 37.2214, lng: 127.1889, items: [] },
-  { id: 14, name: "산학협력관", lat: 37.221, lng: 127.1889, items: [] },
-  { id: 15, name: "차세대과학관", lat: 37.221, lng: 127.1889, items: [] },
-  {
-    id: 16,
-    name: "학생복지관",
-    lat: 37.223225064054425,
-    lng: 127.18672783025089,
-    items: [],
-  },
-  {
-    id: 17,
-    name: "창업보육센터",
-    lat: 37.22296024483864,
-    lng: 127.18609901705975,
-    items: [],
-  },
-  {
-    id: 18,
-    name: "명덕관",
-    lat: 37.22411774471643,
-    lng: 127.18197227736502,
-    items: [],
-  },
-  {
-    id: 19,
-    name: "명현관",
-    lat: 37.2235910492918,
-    lng: 127.18170059088328,
-    items: [],
-  },
-  {
-    id: 20,
-    name: "기숙사3동",
-    lat: 37.22325923176217,
-    lng: 127.18360400156415,
-    items: [],
-  },
-  {
-    id: 21,
-    name: "기숙사4동",
-    lat: 37.22384903960134,
-    lng: 127.1838476843343,
-    items: [],
-  },
-  {
-    id: 22,
-    name: "기숙사5동",
-    lat: 37.223810131953854,
-    lng: 127.18278843765323,
-    items: [],
-  },
-  {
-    id: 23,
-    name: "복지동",
-    lat: 37.22382278553236,
-    lng: 127.18334621334833,
-    items: [],
-  },
+  { id: 6, name: "제2공학관관", lat: 37.2219, lng: 127.1889, items: [] },
 ];
 
 const categoryColor: Record<string, string> = {
-  우산: "#6C8BFF",
+  우산: "#818cf8",
   "지갑/카드": "#f59e0b",
   전자기기: "#10b981",
   의류: "#f87171",
@@ -264,7 +187,7 @@ export default function MapScreen() {
         font-weight: 700;
         color: #fff;
       }
-      .pin-circle.has-items { background: #4F6EF7; }
+      .pin-circle.has-items { background: #6366f1; }
       .pin-circle.no-items { background: #C0C0C0; }
       .pin-label {
         display: none;
@@ -289,7 +212,7 @@ export default function MapScreen() {
     <script type="text/javascript" src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=${KAKAO_API_KEY}&autoload=true"></script>
     <script>
       var map = new kakao.maps.Map(document.getElementById('map'), {
-        center: new kakao.maps.LatLng(37.2243, 127.1886),
+        center: new kakao.maps.LatLng(37.22185, 127.1865),
         level: 4
       });
 
@@ -298,8 +221,8 @@ export default function MapScreen() {
       var myLocationOverlay = null;
       var activeId = null;
 
-      var CAMPUS_CENTER = new kakao.maps.LatLng(37.2243, 127.1886);
-      var CAMPUS_BOUNDS = { minLat: 37.210, maxLat: 37.232, minLng: 127.175, maxLng: 127.220 };
+      var CAMPUS_CENTER = new kakao.maps.LatLng(37.22185, 127.1865);
+      var CAMPUS_BOUNDS = { minLat: 37.208, maxLat: 37.233, minLng: 127.173, maxLng: 127.210 };
 
       buildings.forEach(function(building) {
         var position = new kakao.maps.LatLng(building.lat, building.lng);
@@ -324,7 +247,7 @@ export default function MapScreen() {
 
       function updateMyLocation(lat, lng) {
         if (myLocationOverlay) myLocationOverlay.setMap(null);
-        var content = '<div style="width:14px;height:14px;background:#4F6EF7;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 4px rgba(79,110,247,0.25);"></div>';
+        var content = '<div style="width:14px;height:14px;background:#6366f1;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 4px rgba(99,102,241,0.25);"></div>';
         myLocationOverlay = new kakao.maps.CustomOverlay({
           position: new kakao.maps.LatLng(lat, lng),
           content: content,
@@ -401,8 +324,8 @@ export default function MapScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-        <Text style={styles.headerTitle}>캠퍼스 분실물</Text>
+      <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
+        <Text style={styles.headerTitle}>캠퍼스 지도</Text>
         <View style={styles.headerIcons}>
           <TouchableOpacity style={styles.iconBtn}>
             <Bell size={20} color="#444" />
@@ -465,7 +388,7 @@ export default function MapScreen() {
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.locationBtn} onPress={moveToMyLocation}>
-          <Crosshair size={18} color={userLocation ? "#4F6EF7" : "#aaa"} />
+          <Crosshair size={18} color={userLocation ? "#6366f1" : "#aaa"} />
         </TouchableOpacity>
       </View>
 
@@ -493,16 +416,6 @@ export default function MapScreen() {
                     분실물 {selectedBuilding.items.length}건
                   </Text>
                 </View>
-                <TouchableOpacity
-                  style={styles.moreBtn}
-                  onPress={() => {
-                    bottomSheetRef.current?.snapToIndex(-1);
-                    router.push("/(tabs)/lost-item");
-                  }}
-                >
-                  <Text style={styles.moreBtnText}>전체보기</Text>
-                  <ChevronRight size={14} color="#4F6EF7" />
-                </TouchableOpacity>
               </View>
 
               {selectedBuilding.items.length === 0 ? (
@@ -554,7 +467,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 20,
-    paddingBottom: 10,
+    paddingVertical: 10,
     backgroundColor: "#fff",
   },
   headerTitle: { fontSize: 18, color: "#111", fontFamily: fonts.bold },
@@ -563,7 +476,6 @@ const styles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 10,
-    backgroundColor: "#f5f6f8",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -600,10 +512,10 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 14,
-    backgroundColor: "#4F6EF7",
+    backgroundColor: "#6366f1",
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#4F6EF7",
+    shadowColor: "#6366f1",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.35,
     shadowRadius: 8,
@@ -652,16 +564,6 @@ const styles = StyleSheet.create({
     color: "#aaa",
     marginTop: 2,
   },
-  moreBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 2,
-    backgroundColor: "#f0f4ff",
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 10,
-  },
-  moreBtnText: { fontSize: 12, color: "#4F6EF7", fontFamily: fonts.medium },
   emptyBox: { alignItems: "center", paddingVertical: 40 },
   emptyText: { fontSize: 14, color: "#aaa", fontFamily: fonts.regular },
   itemCard: {

@@ -104,7 +104,7 @@ export default function LoginPage() {
         <View style={styles.topArea}>
           <View style={styles.logoRow}>
             <LinearGradient
-              colors={["#4F6EF7", "#6C8BFF"]}
+              colors={["#6366f1", "#818cf8"]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.logoBox}
@@ -219,7 +219,7 @@ export default function LoginPage() {
             >
               {isValid ? (
                 <LinearGradient
-                  colors={["#4F6EF7", "#6C8BFF"]}
+                  colors={["#6366f1", "#818cf8"]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={[
@@ -352,7 +352,7 @@ const styles = StyleSheet.create({
   loginButtonTextInactive: { color: "#aaa" },
   linkRow: { flexDirection: "row", justifyContent: "space-between" },
   linkText: { fontSize: 13, color: "#aaa", fontFamily: fonts.regular },
-  linkTextBold: { fontSize: 13, color: "#4F6EF7", fontFamily: fonts.bold },
+  linkTextBold: { fontSize: 13, color: "#6366f1", fontFamily: fonts.bold },
   termsRow: {
     flexDirection: "row",
     justifyContent: "center",

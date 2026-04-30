@@ -115,7 +115,7 @@ export default function PasswordStep() {
                   <View key={condition.label} style={styles.conditionItem}>
                     <Check
                       size={13}
-                      color={condition.met ? "#4F6EF7" : "#ccc"}
+                      color={condition.met ? "#6366f1" : "#ccc"}
                     />
                     <Text
                       style={[
@@ -193,7 +193,7 @@ export default function PasswordStep() {
           >
             {isValid ? (
               <LinearGradient
-                colors={["#4F6EF7", "#6C8BFF"]}
+                colors={["#6366f1", "#818cf8"]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.button}
@@ -262,7 +262,7 @@ const styles = StyleSheet.create({
   passwordConditions: { flexDirection: "row", gap: 12, marginTop: 8 },
   conditionItem: { flexDirection: "row", alignItems: "center", gap: 4 },
   conditionText: { fontSize: 12, color: "#ccc", fontFamily: fonts.regular },
-  conditionMet: { color: "#4F6EF7" },
+  conditionMet: { color: "#6366f1" },
   errorBox: {
     flexDirection: "row",
     alignItems: "center",

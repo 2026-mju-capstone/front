@@ -137,7 +137,7 @@ export default function EmailStep() {
           >
             {isEmailValid ? (
               <LinearGradient
-                colors={["#4F6EF7", "#6C8BFF"]}
+                colors={["#6366f1", "#818cf8"]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={[styles.button, isSending && styles.disabledButton]}

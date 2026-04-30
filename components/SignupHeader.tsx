@@ -52,7 +52,7 @@ export default function SignupHeader({ stepIndex }: Props) {
             return (
               <View key={i} style={styles.stepItem}>
                 <LinearGradient
-                  colors={isActive ? ["#4F6EF7", "#6C8BFF"] : ["#fff", "#fff"]}
+                  colors={isActive ? ["#6366f1", "#818cf8"] : ["#fff", "#fff"]}
                   style={[
                     styles.stepCircle,
                     !isActive && styles.stepCircleInactive,
@@ -137,7 +137,7 @@ const styles = StyleSheet.create({
   progressLineFill: {
     position: "absolute",
     height: "100%",
-    backgroundColor: "#4F6EF7",
+    backgroundColor: "#6366f1",
   },
   stepItem: { alignItems: "center", gap: 6, zIndex: 1, width: 55 },
   stepCircle: {
@@ -163,5 +163,5 @@ const styles = StyleSheet.create({
     fontFamily: fonts.medium,
     marginTop: 2,
   },
-  stepLabelActive: { color: "#4F6EF7" },
+  stepLabelActive: { color: "#6366f1" },
 });
