@@ -120,18 +120,6 @@ npx expo run:android
 
 ---
 
-### Metro 서버 실행
-
-앱 설치 후 개발 서버가 필요하면 아래 명령어를 실행합니다.
-
-```bash
-npx expo start --dev-client
-```
-
-이때 뜨는 QR은 **Expo Go용 QR이 아니라 개발 빌드 앱용 QR**입니다.
-반드시 휴대폰에 설치된 개발용 앱에서 열어야 합니다.
-
----
 
 ## ❗ 주의사항
 
