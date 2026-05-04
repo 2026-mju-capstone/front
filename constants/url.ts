@@ -6,4 +6,6 @@ export const CERTIFICATION_URL: string = BASE_URL + "/api/auth/certification";
 export const VERIFY_URL: string = BASE_URL + "/api/auth/verify";
 export const SIGNUP_URL: string = BASE_URL + "/api/auth/signup";
 export const VALIDATION_URL: string = BASE_URL + "/api/auth/validate";
-export const ITEMS_URL: string = BASE_URL + "/api/items";
+export const ITEMS_LIST_URL: string = BASE_URL + "/api/items/post/list";
+export const ITEMS_CREATE_URL: string = BASE_URL + "/api/items/post/create";
+export const ITEMS_DETAIL_URL: string = BASE_URL + "/api/items/post/list";

@@ -1,5 +1,4 @@
 import { fonts } from "@/constants/typography";
-import { validateAccessToken } from "@/utils/api";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
@@ -12,12 +11,7 @@ export default function LoadingScreen() {
 
   useEffect(() => {
     const checkToken = async () => {
-      // 개발 중 임시 - 서버 다운으로 바로 진입
-      //router.replace("/(tabs)/map");
-      //return;
-
       try {
-        await validateAccessToken();
         const token = await AsyncStorage.getItem("token");
         if (token) {
           router.replace("/(tabs)/map");

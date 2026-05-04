@@ -1,4 +1,8 @@
+import { BASE_BUILDINGS } from "@/constants/buildings";
+import { CATEGORY_MAP } from "@/constants/categories";
 import { fonts } from "@/constants/typography";
+import { ITEMS_DETAIL_URL } from "@/constants/url";
+import { sendGetRequest } from "@/utils/api";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
   Book,
@@ -9,11 +13,12 @@ import {
   MessageCircle,
   Package,
   Share2,
-  Shirt,
+  Umbrella,
   X,
 } from "lucide-react-native";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   Dimensions,
   Image,
@@ -31,122 +36,162 @@ import { WebView } from "react-native-webview";
 const KAKAO_API_KEY = "7488059674373cdf0eb9299fef1ec2ec";
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
-const CATEGORY_MAP: Record<string, string> = {
-  BOOK: "도서",
-  ELECTRONICS: "전자기기",
-  CLOTHING: "소지품",
-  WALLET: "지갑/카드",
-  ID_CARD: "지갑/카드",
-  OTHER: "기타",
-};
-
 const categoryIconMap: Record<string, any> = {
-  도서: Book,
-  전자기기: Headphones,
-  소지품: Shirt,
-  "지갑/카드": CreditCard,
-  기타: Package,
+  스마트폰: Headphones,
+  이어폰: Headphones,
+  가방: Package,
+  지갑: CreditCard,
+  카드: CreditCard,
+  학생증: CreditCard,
+  교재: Book,
+  노트: Book,
+  우산: Umbrella,
+  물병: Package,
+  필통: Package,
+  인형: Package,
 };
 
-const statusLabel: Record<string, string> = {
-  LOST: "찾는중",
-  FOUND: "발견됨",
-};
+const statusLabel: Record<string, string> = { LOST: "찾는중", FOUND: "발견됨" };
 
 const statusColor: Record<string, { bg: string; text: string }> = {
   LOST: { bg: "#fff7ed", text: "#f97316" },
   FOUND: { bg: "#dcfce7", text: "#16a34a" },
 };
 
-const DUMMY_DETAIL = {
-  id: 1,
-  type: "FOUND",
-  status: "FOUND",
-  category: "ELECTRONICS",
-  color: "검정",
-  title: "삼성 갤럭시 버즈",
-  description:
-    "검정색 갤럭시 버즈 케이스입니다. 케이스에 스티커가 붙어있어요. 3층 강의실 책상 위에 놓여있었습니다.",
-  image_url:
-    "https://images.unsplash.com/photo-1606220945770-b5b6c2c55bf1?w=800",
-  location_name: "제1공학관 · 3층 강의실",
-  reported_at: new Date(Date.now() - 1000 * 60 * 60).toISOString(),
-  lat: 37.222690087856,
-  lng: 127.18742790765737,
+type ItemDetail = {
+  id: number;
+  type: string;
+  status: string;
+  category: string;
+  image_url?: string;
+  building_id: number;
+  data_address?: string;
+  created_at: string;
+  title?: string;
+  description?: string;
 };
 
 function formatDateTime(dateStr: string) {
   const d = new Date(dateStr);
-  const month = d.getMonth() + 1;
-  const day = d.getDate();
   const h = d.getHours();
-  const m = d.getMinutes();
   const ampm = h < 12 ? "오전" : "오후";
   const hh = h % 12 === 0 ? 12 : h % 12;
-  return `${month}월 ${day}일 ${ampm} ${String(hh).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+  return `${d.getMonth() + 1}월 ${d.getDate()}일 ${ampm} ${String(hh).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 
 export default function LostItemDetail() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams();
+  const [item, setItem] = useState<ItemDetail | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [showImageModal, setShowImageModal] = useState(false);
 
-  // TODO: id로 API 호출해서 실제 데이터 받아오기
-  const item = DUMMY_DETAIL;
+  useEffect(() => {
+    fetchDetail();
+  }, [id]);
 
-  const korCategory = CATEGORY_MAP[item.category] ?? "기타";
-  const IconComponent = categoryIconMap[korCategory] ?? Package;
-  const statusStyle = statusColor[item.type] ?? { bg: "#f3f4f6", text: "#888" };
-  const locationParts = item.location_name?.split(" · ") ?? [];
-  const buildingName = locationParts[0] ?? item.location_name;
-  const detailLocation = locationParts[1] ?? "";
-
-  const handleShare = async () => {
+  const fetchDetail = async () => {
+    setIsLoading(true);
     try {
-      await Share.share({
-        message: `[줍픽] ${item.title} - ${item.location_name}`,
+      await sendGetRequest(`${ITEMS_DETAIL_URL}/${id}`, async (res) => {
+        const result = await res.json();
+        setItem(result.success && result.data ? result.data : null);
       });
     } catch (e) {
+      console.error("상세 조회 실패", e);
+      setItem(null);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleShare = async () => {
+    if (!item) return;
+    const building = BASE_BUILDINGS.find((b) => b.id === item.building_id);
+    const locationText = item.data_address
+      ? `${building?.name} · ${item.data_address}`
+      : (building?.name ?? "");
+    try {
+      await Share.share({
+        message: `[줍픽] ${item.title ?? "분실물"} - ${locationText}`,
+      });
+    } catch {
       Alert.alert("공유 실패");
     }
   };
 
-  const mapHTML = `
-    <!DOCTYPE html>
-    <html>
+  if (isLoading) {
+    return (
+      <View
+        style={[
+          styles.container,
+          { alignItems: "center", justifyContent: "center" },
+        ]}
+      >
+        <ActivityIndicator color="#6366f1" size="large" />
+      </View>
+    );
+  }
+
+  if (!item) {
+    return (
+      <View
+        style={[
+          styles.container,
+          { alignItems: "center", justifyContent: "center" },
+        ]}
+      >
+        <Text style={{ color: "#aaa", fontFamily: fonts.regular }}>
+          게시글을 찾을 수 없어요
+        </Text>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={{ marginTop: 16 }}
+        >
+          <Text style={{ color: "#6366f1", fontFamily: fonts.bold }}>
+            돌아가기
+          </Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  const korCategory = CATEGORY_MAP[item.category] ?? "기타";
+  const IconComponent = categoryIconMap[korCategory] ?? Package;
+  const statusStyle = statusColor[item.type] ?? { bg: "#f3f4f6", text: "#888" };
+  const building = BASE_BUILDINGS.find((b) => b.id === item.building_id);
+  const buildingName = building?.name ?? "";
+  const detailLocation = item.data_address ?? "";
+  const lat = building?.lat;
+  const lng = building?.lng;
+  const hasLocation = lat != null && lng != null;
+
+  const mapHTML = hasLocation
+    ? `
+    <!DOCTYPE html><html>
     <head>
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-      <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        html, body, #map { width: 100%; height: 100%; }
-      </style>
+      <style>* { margin: 0; padding: 0; box-sizing: border-box; } html, body, #map { width: 100%; height: 100%; }</style>
     </head>
     <body>
       <div id="map"></div>
       <script type="text/javascript" src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=${KAKAO_API_KEY}&autoload=true"></script>
       <script>
-        var map = new kakao.maps.Map(document.getElementById('map'), {
-          center: new kakao.maps.LatLng(${item.lat}, ${item.lng}),
-          level: 3
-        });
-        var marker = new kakao.maps.Marker({
-          position: new kakao.maps.LatLng(${item.lat}, ${item.lng}),
-          map: map
-        });
+        var map = new kakao.maps.Map(document.getElementById('map'), { center: new kakao.maps.LatLng(${lat}, ${lng}), level: 3 });
+        new kakao.maps.Marker({ position: new kakao.maps.LatLng(${lat}, ${lng}), map: map });
       </script>
     </body>
     </html>
-  `;
+  `
+    : "";
 
   return (
     <View style={[styles.container, { paddingBottom: insets.bottom }]}>
       <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
-        {/* 히어로 영역 */}
-        <View style={styles.heroArea}>
+        <View style={item.image_url ? styles.heroArea : styles.heroAreaSmall}>
           {item.image_url ? (
-            // 이미지 있을 때 - 탭하면 풀스크린
             <TouchableOpacity
               activeOpacity={0.9}
               onPress={() => setShowImageModal(true)}
@@ -158,15 +203,12 @@ export default function LostItemDetail() {
               />
             </TouchableOpacity>
           ) : (
-            // 이미지 없을 때 - 앱 배경색 + 카테고리 아이콘
             <View style={styles.heroNoImage}>
               <View style={styles.heroIconWrap}>
                 <IconComponent size={52} color="#6366f1" />
               </View>
             </View>
           )}
-
-          {/* 뒤로가기 버튼 */}
           <TouchableOpacity
             style={[styles.backBtn, { top: insets.top + 12 }]}
             onPress={() => router.back()}
@@ -175,9 +217,7 @@ export default function LostItemDetail() {
           </TouchableOpacity>
         </View>
 
-        {/* 메인 카드 */}
         <View style={styles.mainCard}>
-          {/* 뱃지 행 */}
           <View style={styles.badgeRow}>
             <View style={styles.categoryBadge}>
               <Text style={styles.categoryBadgeText}>{korCategory}</Text>
@@ -193,10 +233,8 @@ export default function LostItemDetail() {
             </View>
           </View>
 
-          {/* 제목 */}
-          <Text style={styles.title}>{item.title}</Text>
+          <Text style={styles.title}>{item.title ?? "제목 없음"}</Text>
 
-          {/* 위치 카드 */}
           <View style={styles.locationCard}>
             <View style={styles.locationIconWrap}>
               <MapPin size={18} color="#6366f1" />
@@ -212,12 +250,11 @@ export default function LostItemDetail() {
                 {item.type === "FOUND" ? "습득" : "분실"}
               </Text>
               <Text style={styles.locationTime}>
-                {formatDateTime(item.reported_at)}
+                {formatDateTime(item.created_at)}
               </Text>
             </View>
           </View>
 
-          {/* 상세 설명 */}
           {item.description ? (
             <View style={styles.descSection}>
               <Text style={styles.sectionLabel}>상세 설명</Text>
@@ -225,19 +262,21 @@ export default function LostItemDetail() {
             </View>
           ) : null}
 
-          {/* 카카오맵 */}
-          <Text style={styles.sectionLabel}>위치</Text>
-          <View style={styles.mapWrap}>
-            <WebView
-              source={{ html: mapHTML }}
-              style={styles.map}
-              javaScriptEnabled
-              domStorageEnabled
-              scrollEnabled={false}
-            />
-          </View>
+          {hasLocation ? (
+            <>
+              <Text style={styles.sectionLabel}>위치</Text>
+              <View style={styles.mapWrap}>
+                <WebView
+                  source={{ html: mapHTML }}
+                  style={styles.map}
+                  javaScriptEnabled
+                  domStorageEnabled
+                  scrollEnabled={false}
+                />
+              </View>
+            </>
+          ) : null}
 
-          {/* 채팅 안내 배너 */}
           <View style={styles.chatBanner}>
             <View style={styles.chatBannerIcon}>
               <MessageCircle size={18} color="#6366f1" />
@@ -252,7 +291,6 @@ export default function LostItemDetail() {
         </View>
       </ScrollView>
 
-      {/* 하단 고정 버튼 */}
       <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 8 }]}>
         <TouchableOpacity
           style={styles.chatBtn}
@@ -271,7 +309,6 @@ export default function LostItemDetail() {
         </TouchableOpacity>
       </View>
 
-      {/* 풀스크린 이미지 모달 */}
       <Modal visible={showImageModal} transparent animationType="fade">
         <View style={styles.imageModal}>
           <TouchableOpacity
@@ -293,13 +330,12 @@ export default function LostItemDetail() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#fff" },
-
-  // 히어로
   heroArea: { width: "100%", height: 380, position: "relative" },
+  heroAreaSmall: { width: "100%", position: "relative" },
   heroImage: { width: "100%", height: 380 },
   heroNoImage: {
     width: "100%",
-    height: 380,
+    height: 280,
     backgroundColor: "#eef2ff",
     alignItems: "center",
     justifyContent: "center",
@@ -326,8 +362,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-
-  // 메인 카드
   mainCard: {
     backgroundColor: "#fff",
     borderTopLeftRadius: 24,
@@ -335,10 +369,8 @@ const styles = StyleSheet.create({
     marginTop: -24,
     paddingHorizontal: 20,
     paddingTop: 24,
-    paddingBottom: 120,
+    paddingBottom: 100,
   },
-
-  // 뱃지
   badgeRow: { flexDirection: "row", gap: 8, marginBottom: 12 },
   categoryBadge: {
     backgroundColor: "#f3f4f6",
@@ -349,8 +381,6 @@ const styles = StyleSheet.create({
   categoryBadgeText: { fontSize: 11, fontFamily: fonts.bold, color: "#888" },
   statusBadge: { borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
   statusBadgeText: { fontSize: 11, fontFamily: fonts.bold },
-
-  // 제목
   title: {
     fontSize: 22,
     fontFamily: fonts.bold,
@@ -358,8 +388,6 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     lineHeight: 30,
   },
-
-  // 위치 카드
   locationCard: {
     flexDirection: "row",
     alignItems: "center",
@@ -393,8 +421,6 @@ const styles = StyleSheet.create({
     color: "#555",
     marginTop: 2,
   },
-
-  // 상세 설명
   descSection: { marginBottom: 20 },
   sectionLabel: {
     fontSize: 11,
@@ -409,8 +435,6 @@ const styles = StyleSheet.create({
     color: "#444",
     lineHeight: 22,
   },
-
-  // 지도
   mapWrap: {
     height: 180,
     borderRadius: 14,
@@ -418,8 +442,6 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   map: { flex: 1 },
-
-  // 채팅 배너
   chatBanner: {
     flexDirection: "row",
     alignItems: "flex-start",
@@ -449,8 +471,6 @@ const styles = StyleSheet.create({
     opacity: 0.8,
     lineHeight: 16,
   },
-
-  // 하단 버튼
   bottomBar: {
     position: "absolute",
     bottom: 0,
@@ -487,8 +507,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-
-  // 풀스크린 이미지 모달
   imageModal: {
     flex: 1,
     backgroundColor: "#000",

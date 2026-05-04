@@ -1,11 +1,20 @@
+import { BASE_BUILDINGS } from "@/constants/buildings";
+import { CATEGORIES, COLORS } from "@/constants/categories";
 import { fonts } from "@/constants/typography";
-import { ITEMS_URL } from "@/constants/url";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { ITEMS_CREATE_URL } from "@/constants/url";
+import { sendAccessRequest } from "@/utils/api";
+import DateTimePicker from "@react-native-community/datetimepicker";
+import * as ImagePicker from "expo-image-picker";
+import * as Linking from "expo-linking";
+import * as MediaLibrary from "expo-media-library";
 import { useRouter } from "expo-router";
-import { Camera, ChevronRight, Clock, MapPin, X } from "lucide-react-native";
-import { useState } from "react";
+import { Camera, ChevronRight, MapPin, X } from "lucide-react-native";
+import { useEffect, useState } from "react";
 import {
   Alert,
+  Dimensions,
+  FlatList,
+  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -19,26 +28,8 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-const BUILDINGS = [
-  "제1공학관",
-  "제2공학관",
-  "제3공학관",
-  "명진당",
-  "혜화관",
-  "원흥관",
-  "학생회관",
-  "도서관",
-  "기숙사",
-];
-
-const CATEGORIES: { label: string; value: string }[] = [
-  { label: "도서", value: "BOOK" },
-  { label: "전자기기", value: "ELECTRONICS" },
-  { label: "의류", value: "CLOTHING" },
-  { label: "지갑", value: "WALLET" },
-  { label: "신분증", value: "ID_CARD" },
-  { label: "기타", value: "OTHER" },
-];
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
+const PHOTO_SIZE = (SCREEN_WIDTH - 4) / 3;
 
 function padTwo(n: number) {
   return String(n).padStart(2, "0");
@@ -50,10 +41,9 @@ function formatDate(d: Date) {
 
 function formatTime(d: Date) {
   const h = d.getHours();
-  const m = d.getMinutes();
   const ampm = h < 12 ? "오전" : "오후";
   const hh = h % 12 === 0 ? 12 : h % 12;
-  return `${ampm} ${padTwo(hh)}:${padTwo(m)}`;
+  return `${ampm} ${padTwo(hh)}:${padTwo(d.getMinutes())}`;
 }
 
 export default function LostItemRegister() {
@@ -63,95 +53,162 @@ export default function LostItemRegister() {
   const [type, setType] = useState<"FOUND" | "LOST">("FOUND");
   const [photos, setPhotos] = useState<string[]>([]);
   const [category, setCategory] = useState("");
+  const [color, setColor] = useState("");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [building, setBuilding] = useState("");
+  const [buildingId, setBuildingId] = useState<number | null>(null);
+  const [buildingName, setBuildingName] = useState("");
   const [detail, setDetail] = useState("");
   const [reportedAt, setReportedAt] = useState(new Date());
-
-  const [showBuildingModal, setShowBuildingModal] = useState(false);
   const [showDateModal, setShowDateModal] = useState(false);
   const [showTimeModal, setShowTimeModal] = useState(false);
+  const [showBuildingModal, setShowBuildingModal] = useState(false);
+  const [showPhotoModal, setShowPhotoModal] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [galleryPhotos, setGalleryPhotos] = useState<MediaLibrary.Asset[]>([]);
+  const [selectedUris, setSelectedUris] = useState<string[]>([]);
+  const [hasNextPage, setHasNextPage] = useState(false);
+  const [endCursor, setEndCursor] = useState<string | undefined>();
 
-  const [tempYear, setTempYear] = useState(String(reportedAt.getFullYear()));
-  const [tempMonth, setTempMonth] = useState(String(reportedAt.getMonth() + 1));
-  const [tempDay, setTempDay] = useState(String(reportedAt.getDate()));
-  const [tempHour, setTempHour] = useState(String(reportedAt.getHours()));
-  const [tempMin, setTempMin] = useState(String(reportedAt.getMinutes()));
+  useEffect(() => {
+    (async () => {
+      await MediaLibrary.requestPermissionsAsync();
+      await ImagePicker.requestCameraPermissionsAsync();
+    })();
+  }, []);
 
-  const locationLabel = type === "FOUND" ? "발견 장소" : "분실 장소";
+  const locationLabel = type === "FOUND" ? "발견 위치" : "분실 위치";
   const timeLabel = type === "FOUND" ? "발견 시각" : "분실 시각";
 
-  const handleSubmit = async () => {
-    if (!category) return Alert.alert("카테고리를 선택해주세요");
-    if (!title.trim()) return Alert.alert("물품명을 입력해주세요");
-    if (!building) return Alert.alert("장소를 선택해주세요");
+  const openPhotoModal = async () => {
+    const { status, canAskAgain } =
+      await MediaLibrary.requestPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert(
+        "사진 권한 필요",
+        "설정에서 사진 접근 권한을 허용해주세요.",
+        canAskAgain
+          ? [{ text: "확인" }]
+          : [
+              { text: "취소", style: "cancel" },
+              { text: "설정으로 이동", onPress: () => Linking.openSettings() },
+            ],
+      );
+      return;
+    }
+    setSelectedUris([...photos]);
+    setShowPhotoModal(true);
+    await loadGallery();
+  };
 
-    try {
-      const token = await AsyncStorage.getItem("token");
-      const locationName = detail.trim()
-        ? `${building} · ${detail.trim()}`
-        : building;
+  const loadGallery = async (after?: string) => {
+    const result = await MediaLibrary.getAssetsAsync({
+      mediaType: MediaLibrary.MediaType.photo,
+      sortBy: MediaLibrary.SortBy.creationTime,
+      first: 60,
+      after,
+    });
+    setGalleryPhotos((prev) =>
+      after ? [...prev, ...result.assets] : result.assets,
+    );
+    setHasNextPage(result.hasNextPage);
+    setEndCursor(result.endCursor);
+  };
 
-      const body = {
-        type,
-        category,
-        title: title.trim(),
-        location_name: locationName,
-        reported_at: reportedAt.toISOString(),
-        //image_url: "",
-        // description 필드는 API 생기면 추가
-      };
-
-      const res = await fetch(ITEMS_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(body),
-      });
-      const result = await res.json();
-      if (result.success) {
-        Alert.alert("등록 완료!", "분실물이 등록되었어요.", [
-          { text: "확인", onPress: () => router.back() },
-        ]);
-      } else {
-        Alert.alert("등록 실패", result.message ?? "다시 시도해주세요.");
+  const toggleSelect = (uri: string) => {
+    setSelectedUris((prev) => {
+      if (prev.includes(uri)) return prev.filter((u) => u !== uri);
+      if (prev.length >= 3) {
+        Alert.alert("최대 3장까지 선택할 수 있어요.");
+        return prev;
       }
-    } catch (e) {
-      console.error(e);
-      Alert.alert("오류", "네트워크 오류가 발생했어요.");
+      return [...prev, uri];
+    });
+  };
+
+  const openCamera = async () => {
+    const { status, canAskAgain } =
+      await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert(
+        "카메라 권한 필요",
+        "설정에서 카메라 권한을 허용해주세요.",
+        canAskAgain
+          ? [{ text: "확인" }]
+          : [
+              { text: "취소", style: "cancel" },
+              { text: "설정으로 이동", onPress: () => Linking.openSettings() },
+            ],
+      );
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.8,
+    });
+    if (!result.canceled) {
+      if (photos.length >= 3) {
+        Alert.alert("최대 3장까지 등록할 수 있어요.");
+        return;
+      }
+      setPhotos((p) => [...p, result.assets[0].uri]);
+      setShowPhotoModal(false);
     }
   };
 
-  const applyDate = () => {
-    const y = parseInt(tempYear) || reportedAt.getFullYear();
-    const mo = parseInt(tempMonth) || reportedAt.getMonth() + 1;
-    const d = parseInt(tempDay) || reportedAt.getDate();
-    const next = new Date(reportedAt);
-    next.setFullYear(y);
-    next.setMonth(mo - 1);
-    next.setDate(d);
-    setReportedAt(next);
-    setShowDateModal(false);
+  const validate = () => {
+    const e: Record<string, string> = {};
+    if (!category) e.category = "카테고리를 선택해주세요";
+    if (!color) e.color = "색상을 선택해주세요";
+    if (!title.trim()) e.title = "제목을 입력해주세요";
+    if (!buildingId) e.building = "위치를 선택해주세요";
+    return e;
   };
 
-  const applyTime = () => {
-    const h = parseInt(tempHour) ?? reportedAt.getHours();
-    const m = parseInt(tempMin) ?? reportedAt.getMinutes();
-    const next = new Date(reportedAt);
-    next.setHours(Math.min(h, 23));
-    next.setMinutes(Math.min(m, 59));
-    setReportedAt(next);
-    setShowTimeModal(false);
+  const handleSubmit = async () => {
+    const e = validate();
+    if (Object.keys(e).length > 0) {
+      setErrors(e);
+      return;
+    }
+    setErrors({});
+    try {
+      const body = {
+        type,
+        category,
+        color,
+        title: title.trim(),
+        description: description.trim() || undefined,
+        building_id: buildingId,
+        detail_address: detail.trim() || undefined,
+        reported_at: reportedAt.toISOString(),
+      };
+      await sendAccessRequest(
+        ITEMS_CREATE_URL,
+        JSON.stringify(body),
+        async (res) => {
+          const result = await res.json();
+          if (result.success) {
+            const itemId = result.data?.itemId;
+            // TODO: PostBoardingScreen 구현 후 아래로 교체
+            // router.replace(`/post-boarding?itemId=${itemId}`);
+            if (itemId) router.replace(`/lost-item-detail?id=${itemId}`);
+            else router.back();
+          } else {
+            Alert.alert("등록 실패", result.error ?? "다시 시도해주세요.");
+          }
+        },
+      );
+    } catch {
+      Alert.alert("오류", "네트워크 오류가 발생했어요.");
+    }
   };
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <X size={20} color="#555" />
+        <TouchableOpacity onPress={() => router.back()}>
+          <Text style={styles.backText}>‹</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>분실물 등록</Text>
         <View style={{ width: 28 }} />
@@ -162,39 +219,44 @@ export default function LostItemRegister() {
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
         <ScrollView
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
           contentContainerStyle={[
             styles.scroll,
             { paddingBottom: insets.bottom + 100 },
           ]}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
         >
+          {/* 탭 */}
           <View style={styles.tabRow}>
             {(["FOUND", "LOST"] as const).map((t) => (
               <TouchableOpacity
                 key={t}
                 style={[styles.tab, type === t && styles.tabActive]}
-                onPress={() => setType(t)}
+                onPress={() => {
+                  setType(t);
+                  setErrors({});
+                }}
               >
+                {type === t && <View style={styles.tabDot} />}
                 <Text
                   style={[styles.tabText, type === t && styles.tabTextActive]}
                 >
                   {t === "FOUND" ? "주웠어요" : "잃어버렸어요"}
                 </Text>
-                <Text
-                  style={[styles.tabSub, type === t && styles.tabSubActive]}
-                >
-                  {t === "FOUND" ? "습득 신고" : "분실 신고"}
-                </Text>
               </TouchableOpacity>
             ))}
           </View>
 
-          {/* 사진은 선택사항 */}
-          <Section label="사진" required={false}>
+          {/* 사진 */}
+          <View style={styles.section}>
             <View style={styles.photoRow}>
-              {photos.map((_, i) => (
+              {photos.map((uri, i) => (
                 <View key={i} style={styles.photoBox}>
+                  <Image
+                    source={{ uri }}
+                    style={styles.photoImage}
+                    resizeMode="cover"
+                  />
                   <TouchableOpacity
                     style={styles.photoRemove}
                     onPress={() =>
@@ -208,33 +270,37 @@ export default function LostItemRegister() {
               {photos.length < 3 && (
                 <TouchableOpacity
                   style={styles.photoAdd}
-                  onPress={() => setPhotos((p) => [...p, "placeholder"])}
+                  onPress={openPhotoModal}
                 >
-                  <Camera size={22} color="#bbb" />
+                  <Camera size={24} color="#bbb" />
                   <Text style={styles.photoCount}>{photos.length}/3</Text>
                 </TouchableOpacity>
               )}
             </View>
-            <Text style={styles.photoHint}>
-              최대 3장 · 상태가 잘 보이게 찍어주세요
-            </Text>
-          </Section>
+          </View>
 
-          <Section label="카테고리">
-            <View style={styles.categoryGrid}>
+          {/* 카테고리 */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>
+              카테고리 <Text style={styles.required}>*</Text>
+            </Text>
+            <View style={styles.pillWrap}>
               {CATEGORIES.map((cat) => (
                 <TouchableOpacity
                   key={cat.value}
                   style={[
-                    styles.categoryItem,
-                    category === cat.value && styles.categoryItemActive,
+                    styles.pill,
+                    category === cat.value && styles.pillActive,
                   ]}
-                  onPress={() => setCategory(cat.value)}
+                  onPress={() => {
+                    setCategory(cat.value);
+                    setErrors((e) => ({ ...e, category: "" }));
+                  }}
                 >
                   <Text
                     style={[
-                      styles.categoryLabel,
-                      category === cat.value && styles.categoryLabelActive,
+                      styles.pillText,
+                      category === cat.value && styles.pillTextActive,
                     ]}
                   >
                     {cat.label}
@@ -242,52 +308,142 @@ export default function LostItemRegister() {
                 </TouchableOpacity>
               ))}
             </View>
-          </Section>
+            {errors.category ? (
+              <Text style={styles.errorText}>{errors.category}</Text>
+            ) : null}
+          </View>
 
-          <Section label="물품명">
-            <TextInput
-              style={styles.input}
-              placeholder="예: 검정색 장우산"
-              placeholderTextColor="#bbb"
-              value={title}
-              onChangeText={setTitle}
-              maxLength={40}
-            />
-          </Section>
+          {/* 색상 */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>
+              색상 <Text style={styles.required}>*</Text>
+            </Text>
+            <View style={styles.pillWrap}>
+              {COLORS.map((c) => (
+                <TouchableOpacity
+                  key={c.value}
+                  style={[styles.pill, color === c.value && styles.pillActive]}
+                  onPress={() => {
+                    setColor(c.value);
+                    setErrors((e) => ({ ...e, color: "" }));
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.pillText,
+                      color === c.value && styles.pillTextActive,
+                    ]}
+                  >
+                    {c.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            {errors.color ? (
+              <Text style={styles.errorText}>{errors.color}</Text>
+            ) : null}
+          </View>
 
-          <Section label={locationLabel}>
+          {/* 물품명 */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>
+              물품명 <Text style={styles.required}>*</Text>
+            </Text>
+            <View
+              style={[
+                styles.inputBox,
+                errors.title ? styles.inputBoxError : null,
+              ]}
+            >
+              <TextInput
+                style={styles.input}
+                placeholder="예) 검정색 장우산"
+                placeholderTextColor="#bbb"
+                value={title}
+                onChangeText={(v) => {
+                  setTitle(v);
+                  setErrors((e) => ({ ...e, title: "" }));
+                }}
+                maxLength={40}
+              />
+            </View>
+            {errors.title ? (
+              <Text style={styles.errorText}>{errors.title}</Text>
+            ) : null}
+          </View>
+
+          {/* 상세 설명 */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>상세 설명</Text>
+            <View style={styles.inputBox}>
+              <TextInput
+                style={[
+                  styles.input,
+                  { height: 120, textAlignVertical: "top" },
+                ]}
+                placeholder={
+                  type === "FOUND"
+                    ? "어디서 어떻게 발견했는지, 어떤 특징이 있는지 자세히 알려주세요."
+                    : "언제 어디서 잃어버렸는지, 어떤 특징이 있는지 자세히 알려주세요."
+                }
+                placeholderTextColor="#bbb"
+                value={description}
+                onChangeText={setDescription}
+                multiline
+                maxLength={300}
+              />
+            </View>
+            <Text style={styles.charCount}>{description.length}/300</Text>
+          </View>
+
+          {/* 위치 */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>
+              {locationLabel} <Text style={styles.required}>*</Text>
+            </Text>
             <TouchableOpacity
-              style={styles.selectRow}
+              style={[
+                styles.inputBox,
+                styles.selectBox,
+                errors.building ? styles.inputBoxError : null,
+              ]}
               onPress={() => setShowBuildingModal(true)}
             >
-              <MapPin size={14} color="#bbb" />
+              <MapPin size={15} color="#bbb" />
               <Text
-                style={[styles.selectText, building && styles.selectTextFilled]}
+                style={[
+                  styles.selectText,
+                  buildingName && styles.selectTextFilled,
+                ]}
               >
-                {building || "건물을 선택해주세요"}
+                {buildingName || "건물을 선택해주세요"}
               </Text>
-              <ChevronRight size={14} color="#bbb" />
+              <ChevronRight size={15} color="#bbb" />
             </TouchableOpacity>
-            <TextInput
-              style={[styles.input, { marginTop: 8 }]}
-              placeholder="세부 위치 (예: 3층 강의실 입구)"
-              placeholderTextColor="#bbb"
-              value={detail}
-              onChangeText={setDetail}
-              maxLength={50}
-            />
-          </Section>
+            {errors.building ? (
+              <Text style={styles.errorText}>{errors.building}</Text>
+            ) : null}
+            <View style={[styles.inputBox, { marginTop: 8 }]}>
+              <TextInput
+                style={styles.input}
+                placeholder="세부 위치 (예: 3층 강의실 입구)"
+                placeholderTextColor="#bbb"
+                value={detail}
+                onChangeText={setDetail}
+                maxLength={50}
+              />
+            </View>
+          </View>
 
-          <Section label={timeLabel}>
+          {/* 날짜/시간 */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>
+              {timeLabel} <Text style={styles.required}>*</Text>
+            </Text>
             <View style={styles.datetimeRow}>
               <TouchableOpacity
                 style={[styles.datetimeBtn, { flex: 1.4 }]}
-                onPress={() => {
-                  setTempYear(String(reportedAt.getFullYear()));
-                  setTempMonth(String(reportedAt.getMonth() + 1));
-                  setTempDay(String(reportedAt.getDate()));
-                  setShowDateModal(true);
-                }}
+                onPress={() => setShowDateModal(true)}
               >
                 <Text style={styles.datetimeText}>
                   {formatDate(reportedAt)}
@@ -295,44 +451,100 @@ export default function LostItemRegister() {
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.datetimeBtn, { flex: 1 }]}
-                onPress={() => {
-                  setTempHour(String(reportedAt.getHours()));
-                  setTempMin(String(reportedAt.getMinutes()));
-                  setShowTimeModal(true);
-                }}
+                onPress={() => setShowTimeModal(true)}
               >
-                <Clock size={13} color="#aaa" />
                 <Text style={styles.datetimeText}>
                   {formatTime(reportedAt)}
                 </Text>
               </TouchableOpacity>
             </View>
-          </Section>
-
-          {/* 상세설명 - 선택사항, description API 생기면 body에 추가 */}
-          <Section label="상세설명" required={false}>
-            <TextInput
-              style={styles.descInput}
-              placeholder={"색상, 브랜드, 특징 등\n자세한 설명을 적어주세요"}
-              placeholderTextColor="#bbb"
-              value={description}
-              onChangeText={setDescription}
-              multiline
-              maxLength={300}
-              textAlignVertical="top"
-            />
-            <Text style={styles.descCount}>{description.length}/300</Text>
-          </Section>
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
 
+      {/* 등록 버튼 */}
       <View style={[styles.submitWrap, { paddingBottom: insets.bottom + 12 }]}>
         <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit}>
           <Text style={styles.submitText}>등록하기</Text>
         </TouchableOpacity>
       </View>
 
-      {/* 건물 선택 바텀시트 */}
+      {/* 사진 선택 모달 */}
+      <Modal visible={showPhotoModal} animationType="slide">
+        <View style={[styles.photoModalContainer, { paddingTop: insets.top }]}>
+          <View style={styles.photoModalHeader}>
+            <TouchableOpacity onPress={() => setShowPhotoModal(false)}>
+              <X size={22} color="#333" />
+            </TouchableOpacity>
+            <Text style={styles.photoModalTitle}>사진 선택</Text>
+            <TouchableOpacity
+              onPress={() => {
+                setPhotos(selectedUris);
+                setShowPhotoModal(false);
+              }}
+            >
+              <Text
+                style={[
+                  styles.photoModalDone,
+                  selectedUris.length > 0 && styles.photoModalDoneActive,
+                ]}
+              >
+                완료 ({selectedUris.length}/3)
+              </Text>
+            </TouchableOpacity>
+          </View>
+          <FlatList
+            data={[{ id: "camera", uri: "" }, ...galleryPhotos]}
+            keyExtractor={(item) => item.id}
+            numColumns={3}
+            onEndReached={() => {
+              if (hasNextPage) loadGallery(endCursor);
+            }}
+            onEndReachedThreshold={0.5}
+            contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}
+            renderItem={({ item }) => {
+              if (item.id === "camera") {
+                return (
+                  <TouchableOpacity
+                    style={styles.cameraCell}
+                    onPress={openCamera}
+                  >
+                    <Camera size={28} color="#888" />
+                    <Text style={styles.cameraCellText}>카메라</Text>
+                  </TouchableOpacity>
+                );
+              }
+              const selectedIndex = selectedUris.indexOf(item.uri);
+              const isSelected = selectedIndex !== -1;
+              return (
+                <TouchableOpacity
+                  style={styles.galleryCell}
+                  onPress={() => toggleSelect(item.uri)}
+                  activeOpacity={0.8}
+                >
+                  <Image
+                    source={{ uri: item.uri }}
+                    style={styles.galleryCellImage}
+                  />
+                  {isSelected ? (
+                    <View style={styles.galleryCellOverlay}>
+                      <View style={styles.galleryCellBadge}>
+                        <Text style={styles.galleryCellBadgeText}>
+                          {selectedIndex + 1}
+                        </Text>
+                      </View>
+                    </View>
+                  ) : (
+                    <View style={styles.galleryCellCircle} />
+                  )}
+                </TouchableOpacity>
+              );
+            }}
+          />
+        </View>
+      </Modal>
+
+      {/* 건물 선택 모달 */}
       <Modal visible={showBuildingModal} transparent animationType="slide">
         <Pressable
           style={styles.modalOverlay}
@@ -343,216 +555,118 @@ export default function LostItemRegister() {
         >
           <View style={styles.sheetHandle} />
           <Text style={styles.sheetTitle}>건물 선택</Text>
-          {BUILDINGS.map((b) => (
+          {BASE_BUILDINGS.map((b) => (
             <TouchableOpacity
-              key={b}
+              key={b.id}
               style={[
                 styles.sheetItem,
-                building === b && styles.sheetItemActive,
+                buildingId === b.id && styles.sheetItemActive,
               ]}
               onPress={() => {
-                setBuilding(b);
+                setBuildingId(b.id);
+                setBuildingName(b.name);
                 setShowBuildingModal(false);
+                setErrors((e) => ({ ...e, building: "" }));
               }}
             >
               <Text
                 style={[
                   styles.sheetItemText,
-                  building === b && styles.sheetItemTextActive,
+                  buildingId === b.id && styles.sheetItemTextActive,
                 ]}
               >
-                {b}
+                {b.name}
               </Text>
             </TouchableOpacity>
           ))}
         </View>
       </Modal>
 
-      {/* 날짜 입력 바텀시트 */}
-      <Modal visible={showDateModal} transparent animationType="slide">
-        <Pressable
-          style={styles.modalOverlay}
-          onPress={() => setShowDateModal(false)}
+      {showDateModal && (
+        <DateTimePicker
+          value={reportedAt}
+          mode="date"
+          display="calendar"
+          maximumDate={new Date()}
+          onChange={(_, date) => {
+            setShowDateModal(false);
+            if (date) setReportedAt(date);
+          }}
         />
-        <View
-          style={[styles.bottomSheet, { paddingBottom: insets.bottom + 16 }]}
-        >
-          <View style={styles.sheetHandle} />
-          <Text style={styles.sheetTitle}>날짜 입력</Text>
-          <View style={styles.dateInputRow}>
-            <View style={styles.dateField}>
-              <Text style={styles.dateFieldLabel}>년</Text>
-              <TextInput
-                style={styles.dateInput}
-                value={tempYear}
-                onChangeText={setTempYear}
-                keyboardType="number-pad"
-                maxLength={4}
-              />
-            </View>
-            <View style={styles.dateField}>
-              <Text style={styles.dateFieldLabel}>월</Text>
-              <TextInput
-                style={styles.dateInput}
-                value={tempMonth}
-                onChangeText={setTempMonth}
-                keyboardType="number-pad"
-                maxLength={2}
-              />
-            </View>
-            <View style={styles.dateField}>
-              <Text style={styles.dateFieldLabel}>일</Text>
-              <TextInput
-                style={styles.dateInput}
-                value={tempDay}
-                onChangeText={setTempDay}
-                keyboardType="number-pad"
-                maxLength={2}
-              />
-            </View>
-          </View>
-          <TouchableOpacity style={styles.sheetConfirmBtn} onPress={applyDate}>
-            <Text style={styles.sheetConfirmText}>확인</Text>
-          </TouchableOpacity>
-        </View>
-      </Modal>
-
-      {/* 시간 입력 바텀시트 */}
-      <Modal visible={showTimeModal} transparent animationType="slide">
-        <Pressable
-          style={styles.modalOverlay}
-          onPress={() => setShowTimeModal(false)}
+      )}
+      {showTimeModal && (
+        <DateTimePicker
+          value={reportedAt}
+          mode="time"
+          display="spinner"
+          onChange={(_, date) => {
+            setShowTimeModal(false);
+            if (date) setReportedAt(date);
+          }}
         />
-        <View
-          style={[styles.bottomSheet, { paddingBottom: insets.bottom + 16 }]}
-        >
-          <View style={styles.sheetHandle} />
-          <Text style={styles.sheetTitle}>시간 입력</Text>
-          <View style={styles.dateInputRow}>
-            <View style={styles.dateField}>
-              <Text style={styles.dateFieldLabel}>시 (0-23)</Text>
-              <TextInput
-                style={styles.dateInput}
-                value={tempHour}
-                onChangeText={setTempHour}
-                keyboardType="number-pad"
-                maxLength={2}
-              />
-            </View>
-            <View style={styles.dateField}>
-              <Text style={styles.dateFieldLabel}>분</Text>
-              <TextInput
-                style={styles.dateInput}
-                value={tempMin}
-                onChangeText={setTempMin}
-                keyboardType="number-pad"
-                maxLength={2}
-              />
-            </View>
-          </View>
-          <TouchableOpacity style={styles.sheetConfirmBtn} onPress={applyTime}>
-            <Text style={styles.sheetConfirmText}>확인</Text>
-          </TouchableOpacity>
-        </View>
-      </Modal>
-    </View>
-  );
-}
-
-function Section({
-  label,
-  children,
-  required = true,
-}: {
-  label: string;
-  children: React.ReactNode;
-  required?: boolean;
-}) {
-  return (
-    <View style={styles.section}>
-      <Text style={styles.sectionLabel}>
-        {label}
-        {required && <Text style={{ color: "#f87171" }}> *</Text>}
-      </Text>
-      {children}
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f5f6f9" },
+  container: { flex: 1, backgroundColor: "#fff" },
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 20,
-    paddingVertical: 12,
-    backgroundColor: "#f5f6f9",
+    paddingVertical: 14,
+    borderBottomWidth: 0.5,
+    borderBottomColor: "#f0f0f0",
   },
-  backBtn: { padding: 4 },
+  backText: { fontSize: 28, color: "#333", lineHeight: 32 },
   headerTitle: { fontSize: 16, fontFamily: fonts.bold, color: "#111" },
-
-  scroll: { paddingHorizontal: 16, paddingTop: 8 },
-
-  tabRow: {
+  scroll: { paddingHorizontal: 20 },
+  tabRow: { flexDirection: "row", gap: 8, marginTop: 20, marginBottom: 24 },
+  tab: {
+    flex: 1,
     flexDirection: "row",
-    backgroundColor: "#fff",
-    borderRadius: 16,
-    padding: 4,
-    marginBottom: 20,
-    shadowColor: "#000",
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    elevation: 1,
-  },
-  tab: { flex: 1, alignItems: "center", paddingVertical: 10, borderRadius: 13 },
-  tabActive: { backgroundColor: "#6366f1" },
-  tabText: { fontSize: 14, fontFamily: fonts.bold, color: "#aaa" },
-  tabTextActive: { color: "#fff" },
-  tabSub: {
-    fontSize: 11,
-    fontFamily: fonts.regular,
-    color: "#ccc",
-    marginTop: 2,
-  },
-  tabSubActive: { color: "#c7d0ff" },
-
-  section: {
-    backgroundColor: "#fff",
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: "#000",
-    shadowOpacity: 0.03,
-    shadowRadius: 4,
-    elevation: 1,
-  },
-  sectionLabel: {
-    fontSize: 13,
-    fontFamily: fonts.bold,
-    color: "#333",
-    marginBottom: 12,
-  },
-
-  photoRow: { flexDirection: "row", gap: 10 },
-  photoAdd: {
-    width: 76,
-    height: 76,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: "#e5e7eb",
-    borderStyle: "dashed",
     alignItems: "center",
     justifyContent: "center",
-    gap: 4,
+    paddingVertical: 12,
+    borderRadius: 24,
+    borderWidth: 1.5,
+    borderColor: "#e5e7eb",
+    gap: 6,
+  },
+  tabActive: { backgroundColor: "#6366f1", borderColor: "#6366f1" },
+  tabDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "#fff" },
+  tabText: { fontSize: 14, fontFamily: fonts.bold, color: "#aaa" },
+  tabTextActive: { color: "#fff" },
+  section: { marginBottom: 28 },
+  sectionTitle: {
+    fontSize: 15,
+    fontFamily: fonts.bold,
+    color: "#111",
+    marginBottom: 12,
+  },
+  required: { color: "#6366f1" },
+  photoRow: { flexDirection: "row", gap: 10 },
+  photoAdd: {
+    width: 100,
+    height: 100,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
     backgroundColor: "#fafafa",
   },
   photoBox: {
-    width: 76,
-    height: 76,
+    width: 100,
+    height: 100,
     borderRadius: 12,
-    backgroundColor: "#e5e7eb",
+    overflow: "hidden",
+    position: "relative",
   },
+  photoImage: { width: "100%", height: "100%" },
   photoRemove: {
     position: "absolute",
     top: 4,
@@ -561,111 +675,135 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     padding: 3,
   },
-  photoCount: { fontSize: 10, color: "#bbb", fontFamily: fonts.regular },
-  photoHint: {
+  photoCount: { fontSize: 12, color: "#bbb", fontFamily: fonts.regular },
+  pillWrap: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  pill: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 24,
+    borderWidth: 1.5,
+    borderColor: "#e5e7eb",
+    backgroundColor: "#fff",
+  },
+  pillActive: { backgroundColor: "#6366f1", borderColor: "#6366f1" },
+  pillText: { fontSize: 14, fontFamily: fonts.regular, color: "#555" },
+  pillTextActive: { color: "#fff", fontFamily: fonts.bold },
+  inputBox: {
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    backgroundColor: "#fff",
+  },
+  inputBoxError: { borderColor: "#f87171" },
+  input: { fontSize: 15, fontFamily: fonts.regular, color: "#111", padding: 0 },
+  errorText: {
+    fontSize: 12,
+    color: "#f87171",
+    fontFamily: fonts.regular,
+    marginTop: 6,
+  },
+  charCount: {
     fontSize: 11,
     color: "#bbb",
-    fontFamily: fonts.regular,
-    marginTop: 8,
-  },
-
-  categoryGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  categoryItem: {
-    width: "30%",
-    paddingVertical: 13,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 14,
-    borderWidth: 1.5,
-    borderColor: "#e5e7eb",
-    backgroundColor: "#fafafa",
-  },
-  categoryItemActive: { borderColor: "#6366f1", backgroundColor: "#eef2ff " },
-  categoryLabel: { fontSize: 13, fontFamily: fonts.bold, color: "#aaa" },
-  categoryLabelActive: { color: "#6366f1" },
-
-  input: {
-    borderWidth: 1.5,
-    borderColor: "#e5e7eb",
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 11,
-    fontSize: 13,
-    fontFamily: fonts.regular,
-    color: "#111",
-    backgroundColor: "#fafafa",
-  },
-
-  selectRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderWidth: 1.5,
-    borderColor: "#e5e7eb",
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    backgroundColor: "#fafafa",
-    gap: 8,
-  },
-  selectText: {
-    flex: 1,
-    fontSize: 13,
-    fontFamily: fonts.regular,
-    color: "#bbb",
-  },
-  selectTextFilled: { color: "#111" },
-
-  datetimeRow: { flexDirection: "row", gap: 8 },
-  datetimeBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderWidth: 1.5,
-    borderColor: "#e5e7eb",
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    backgroundColor: "#fafafa",
-    gap: 6,
-  },
-  datetimeText: { fontSize: 13, fontFamily: fonts.regular, color: "#333" },
-
-  descInput: {
-    borderWidth: 1.5,
-    borderColor: "#e5e7eb",
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 13,
-    fontFamily: fonts.regular,
-    color: "#111",
-    backgroundColor: "#fafafa",
-    height: 130,
-  },
-  descCount: {
-    fontSize: 11,
-    color: "#ccc",
     fontFamily: fonts.regular,
     textAlign: "right",
     marginTop: 6,
   },
-
+  selectBox: { flexDirection: "row", alignItems: "center", gap: 8 },
+  selectText: {
+    flex: 1,
+    fontSize: 15,
+    fontFamily: fonts.regular,
+    color: "#bbb",
+  },
+  selectTextFilled: { color: "#111" },
+  datetimeRow: { flexDirection: "row", gap: 8 },
+  datetimeBtn: {
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    backgroundColor: "#fff",
+    alignItems: "center",
+  },
+  datetimeText: { fontSize: 14, fontFamily: fonts.regular, color: "#111" },
   submitWrap: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     paddingTop: 12,
-    backgroundColor: "#f5f6f9",
+    backgroundColor: "#fff",
+    borderTopWidth: 0.5,
+    borderTopColor: "#f0f0f0",
   },
   submitBtn: {
     backgroundColor: "#6366f1",
-    borderRadius: 16,
-    paddingVertical: 15,
+    borderRadius: 12,
+    paddingVertical: 16,
     alignItems: "center",
     shadowColor: "#6366f1",
     shadowOpacity: 0.3,
     shadowRadius: 8,
-    elevation: 5,
+    elevation: 4,
   },
-  submitText: { fontSize: 15, fontFamily: fonts.bold, color: "#fff" },
-
+  submitText: { fontSize: 16, fontFamily: fonts.bold, color: "#fff" },
+  photoModalContainer: { flex: 1, backgroundColor: "#fff" },
+  photoModalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderBottomWidth: 0.5,
+    borderBottomColor: "#f0f0f0",
+  },
+  photoModalTitle: { fontSize: 16, fontFamily: fonts.bold, color: "#111" },
+  photoModalDone: { fontSize: 14, fontFamily: fonts.bold, color: "#bbb" },
+  photoModalDoneActive: { color: "#6366f1" },
+  cameraCell: {
+    width: PHOTO_SIZE,
+    height: PHOTO_SIZE,
+    backgroundColor: "#f5f5f5",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    margin: 1,
+  },
+  cameraCellText: { fontSize: 12, color: "#888", fontFamily: fonts.regular },
+  galleryCell: {
+    width: PHOTO_SIZE,
+    height: PHOTO_SIZE,
+    margin: 1,
+    position: "relative",
+  },
+  galleryCellImage: { width: "100%", height: "100%" },
+  galleryCellOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(99,102,241,0.3)",
+  },
+  galleryCellBadge: {
+    position: "absolute",
+    top: 6,
+    right: 6,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: "#6366f1",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  galleryCellBadgeText: { fontSize: 12, fontFamily: fonts.bold, color: "#fff" },
+  galleryCellCircle: {
+    position: "absolute",
+    top: 6,
+    right: 6,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: "#fff",
+  },
   modalOverlay: { flex: 1, backgroundColor: "#00000033" },
   bottomSheet: {
     backgroundColor: "#fff",
@@ -688,7 +826,6 @@ const styles = StyleSheet.create({
     color: "#111",
     marginBottom: 12,
   },
-
   sheetItem: {
     paddingVertical: 14,
     borderBottomWidth: 1,
@@ -701,27 +838,4 @@ const styles = StyleSheet.create({
   },
   sheetItemText: { fontSize: 14, fontFamily: fonts.regular, color: "#444" },
   sheetItemTextActive: { color: "#6366f1", fontFamily: fonts.bold },
-
-  dateInputRow: { flexDirection: "row", gap: 12, marginVertical: 16 },
-  dateField: { flex: 1, alignItems: "center", gap: 6 },
-  dateFieldLabel: { fontSize: 12, fontFamily: fonts.regular, color: "#aaa" },
-  dateInput: {
-    width: "100%",
-    borderWidth: 1.5,
-    borderColor: "#e5e7eb",
-    borderRadius: 12,
-    paddingVertical: 10,
-    textAlign: "center",
-    fontSize: 18,
-    fontFamily: fonts.bold,
-    color: "#111",
-  },
-  sheetConfirmBtn: {
-    backgroundColor: "#6366f1",
-    borderRadius: 14,
-    paddingVertical: 13,
-    alignItems: "center",
-    marginTop: 4,
-  },
-  sheetConfirmText: { fontSize: 14, fontFamily: fonts.bold, color: "#fff" },
 });
