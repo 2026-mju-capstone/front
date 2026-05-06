@@ -35,34 +35,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useSignup as useSignupData } from "./_layout";
-
-const DEPARTMENTS = [
-  "화학전공",
-  "에너지공학전공",
-  "식품영양학전공",
-  "생명과학정보학전공",
-  "기계공학전공",
-  "산업경영공학전공",
-  "토목환경공학전공",
-  "교통시스템공학전공",
-  "환경시스템공학전공",
-  "화학공학전공",
-  "신소재공학전공",
-  "반도체공학",
-  "전기공학전공",
-  "전자공학전공",
-  "컴퓨터공학전공",
-  "정보통신공학전공",
-  "체육학전공",
-  "스포츠산업학전공",
-  "뮤지컬공연전공",
-  "연극·영화전공",
-  "아트앤멀티미디어음악",
-  "건축학전공",
-  "전통건축전공",
-  "산업디자인전공",
-  "영상애니메이션디자인전공",
-].sort();
+import { DEPARTMENTS } from "@/constants/departments";
 
 const GRADES = ["1학년", "2학년", "3학년", "4학년"];
 

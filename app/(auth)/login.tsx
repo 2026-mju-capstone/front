@@ -1,6 +1,7 @@
 import { fonts } from "@/constants/typography";
 import { useLogin } from "@/hooks/mutations/useAuthMutations";
 import { getFCMToken, sendTokenToServer } from "@/hooks/use-notifications";
+import { useAuthStore } from "@/store/authStore";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
@@ -58,7 +59,8 @@ export default function LoginPage() {
           if (result.success) {
             Keyboard.dismiss();
             console.log("Login Success! Received Token:", result.data.accessToken);
-            await AsyncStorage.setItem("token", result.data.accessToken);
+            // AsyncStorage 대신 zustand 스토어 사용
+            await useAuthStore.getState().setToken(result.data.accessToken);
             await getFCMToken(sendTokenToServer);
             requestAnimationFrame(() => {
               router.replace("/(tabs)/map");

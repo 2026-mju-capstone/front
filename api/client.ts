@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { BASE_URL } from '@/constants/url';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAuthStore } from '@/store/authStore';
 
 const axiosInstance = axios.create({
   baseURL: BASE_URL,
@@ -12,11 +12,14 @@ const axiosInstance = axios.create({
 // Request Interceptor: Add Authorization token
 axiosInstance.interceptors.request.use(
   async (config) => {
-    const token = await AsyncStorage.getItem('token');
+    // 스토어에서 직접 토큰을 가져오거나 상태가 없으면 스토어의 현재 값을 참조
+    const token = useAuthStore.getState().token;
+    
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
-      console.log(`[API Request] ${config.method?.toUpperCase()} ${config.url}`);
-      console.log(`[Auth Token] ${token}`);
+      if (__DEV__) {
+        console.log(`[API Request] ${config.method?.toUpperCase()} ${config.url}`);
+      }
     }
     return config;
   },
@@ -28,7 +31,8 @@ axiosInstance.interceptors.response.use(
   (response) => response,
   async (error) => {
     if (error.response?.status === 401) {
-      await AsyncStorage.removeItem('token');
+      // 401 발생 시 스토어 초기화 (자동 로그아웃 유도)
+      await useAuthStore.getState().clearToken();
     }
     return Promise.reject(error);
   }

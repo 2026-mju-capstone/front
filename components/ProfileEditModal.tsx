@@ -17,17 +17,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { UserProfile, UpdateProfileRequest } from '@/api/types';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { userService } from '@/api/services/user';
-
-const DEPARTMENTS = [
-  "인문대학", "사회과학대학", "경영대학", "법과대학", "ICT융합대학",
-  "자연과학대학", "공과대학", "예술체육대학", "건축대학", "국제대학",
-  "컴퓨터공학과", "융합소프트웨어학과", "전자공학과", "전기공학과", "기계공학과",
-  "화학공학과", "환경에너지공학과", "토목공학과", "교통공학과", "산업경영공학과",
-  "신소재공학과", "컴퓨터공학과", "정보통신공학과", "융합보안안보학과", "디지털미디어학과",
-  "아동학과", "청소년지도학과", "교육학습심리학과", "디자인학부", "바둑학과",
-  "체육학부", "음악학부", "공간디자인전공", "영상디자인전공", "패션디자인전공",
-  "시각디자인전공", "건축학부", "전공자유학부", "디지털콘텐츠디자인학과", "데이터테크놀로지전공",
-].sort();
+import { DEPARTMENTS } from '@/constants/departments';
 
 interface ProfileEditModalProps {
   isVisible: boolean;

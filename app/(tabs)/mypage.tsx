@@ -18,12 +18,14 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useProfile } from '@/hooks/queries/useUserQueries';
 import { authService } from '@/api/services/auth';
+import { useAuthStore } from '@/store/authStore';
 import ProfileEditModal from '@/components/ProfileEditModal';
 
 export default function MyPageScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { data: profile, isLoading } = useProfile();
+  const { clearToken } = useAuthStore();
   
   const [pushEnabled, setPushEnabled] = useState(true);
   const [chatOnlyMode, setChatOnlyMode] = useState(true);
@@ -40,9 +42,10 @@ export default function MyPageScreen() {
           onPress: async () => {
             try {
               await authService.logout();
-              router.replace('/(auth)/login');
+              await clearToken();
+              // router.replace는 _layout.tsx의 useEffect에서 자동으로 처리됨
             } catch (error) {
-              Alert.alert("에러", "로그아웃 중 오류가 발생했습니다.");
+              await clearToken(); // 에러가 나더라도 로컬 토큰은 삭제
             }
           } 
         }

@@ -1,5 +1,6 @@
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useNotifications } from "@/hooks/use-notifications";
+import { useAuthStore } from "@/store/authStore";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import {
   DarkTheme,
@@ -8,7 +9,7 @@ import {
 } from "@react-navigation/native";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useFonts } from "expo-font";
-import { Stack } from "expo-router";
+import { Stack, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
@@ -23,6 +24,10 @@ const queryClient = new QueryClient();
 
 export default function RootLayout() {
   useNotifications();
+  const router = useRouter();
+  const segments = useSegments();
+  const { token, isInitialized, initialize } = useAuthStore();
+  
   const colorScheme = useColorScheme();
   const [fontsLoaded] = useFonts({
     "Pretendard-Regular": require("../assets/fonts/Pretendard-Regular.otf"),
@@ -30,13 +35,34 @@ export default function RootLayout() {
     "Pretendard-Bold": require("../assets/fonts/Pretendard-Bold.otf"),
   });
 
+  // 1. 앱 시작 시 토큰 초기화
   useEffect(() => {
-    if (fontsLoaded) {
+    initialize();
+  }, []);
+
+  // 2. 폰트 로딩 완료 시 스플래시 숨기기
+  useEffect(() => {
+    if (fontsLoaded && isInitialized) {
       SplashScreen.hideAsync();
     }
-  }, [fontsLoaded]);
+  }, [fontsLoaded, isInitialized]);
 
-  if (!fontsLoaded) return null;
+  // 3. 인증 상태에 따른 리다이렉트 처리
+  useEffect(() => {
+    if (!isInitialized) return;
+
+    const inAuthGroup = segments[0] === "(auth)";
+
+    if (!token && !inAuthGroup) {
+      // 토큰이 없는데 인증이 필요한 페이지에 있다면 로그인으로 이동
+      router.replace("/(auth)/login");
+    } else if (token && inAuthGroup) {
+      // 토큰이 있는데 로그인/회원가입 페이지에 있다면 메인으로 이동
+      router.replace("/(tabs)/map");
+    }
+  }, [token, isInitialized, segments]);
+
+  if (!fontsLoaded || !isInitialized) return null;
 
   return (
     <QueryClientProvider client={queryClient}>
