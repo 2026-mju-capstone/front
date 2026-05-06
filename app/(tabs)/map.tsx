@@ -1,13 +1,22 @@
+import { BASE_BUILDINGS } from "@/constants/buildings";
+import { CATEGORY_MAP } from "@/constants/categories";
 import { fonts } from "@/constants/typography";
+import { ITEMS_LIST_URL } from "@/constants/url";
+import { sendAccessRequest } from "@/utils/api";
 import BottomSheet, { BottomSheetScrollView } from "@gorhom/bottom-sheet";
 import * as Location from "expo-location";
 import { useRouter } from "expo-router";
 import {
   Bell,
+  Book,
   ChevronRight,
+  CreditCard,
   Crosshair,
+  Headphones,
+  Package,
   Plus,
   Search,
+  Umbrella,
   User,
 } from "lucide-react-native";
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -24,12 +33,38 @@ import { WebView } from "react-native-webview";
 
 const KAKAO_API_KEY = "7488059674373cdf0eb9299fef1ec2ec";
 
-type Item = {
+const TYPE_MAP: Record<string, string> = { LOST: "찾는중", FOUND: "발견됨" };
+
+const categoryIconMap: Record<string, any> = {
+  스마트폰: Headphones,
+  이어폰: Headphones,
+  가방: Package,
+  지갑: CreditCard,
+  카드: CreditCard,
+  학생증: CreditCard,
+  교재: Book,
+  노트: Book,
+  우산: Umbrella,
+  물병: Package,
+  필통: Package,
+  인형: Package,
+};
+
+const statusDotColor: Record<string, string> = {
+  LOST: "#f97316",
+  FOUND: "#22c55e",
+};
+
+type ApiItem = {
   id: number;
-  title: string;
-  location: string;
-  time: string;
+  type: string;
+  status: string;
   category: string;
+  title?: string;
+  building_id: number;
+  data_address?: string;
+  created_at: string;
+  image_url?: string;
 };
 
 type Building = {
@@ -37,128 +72,17 @@ type Building = {
   name: string;
   lat: number;
   lng: number;
-  items: Item[];
+  items: ApiItem[];
 };
 
-const BUILDINGS: Building[] = [
-  {
-    id: 1,
-    name: "제1공학관",
-    lat: 37.222690087856,
-    lng: 127.18742790765737,
-    items: [],
-  },
-  {
-    id: 2,
-    name: "제2공학관",
-    lat: 37.221724937276406,
-    lng: 127.18665371173557,
-    items: [],
-  },
-  { id: 3, name: "제3공학관", lat: 37.2157, lng: 127.1827, items: [] },
-  { id: 4, name: "제4공학관", lat: 37.2157, lng: 127.1827, items: [] },
-  {
-    id: 5,
-    name: "제5공학관",
-    lat: 37.222083935325806,
-    lng: 127.18755316511282,
-    items: [],
-  },
-  { id: 6, name: "명진당", lat: 37.2219, lng: 127.1889, items: [] },
-  { id: 7, name: "함박관", lat: 37.2218, lng: 127.1889, items: [] },
-  {
-    id: 8,
-    name: "학생회관",
-    lat: 37.22347653798419,
-    lng: 127.18724675644056,
-    items: [],
-  },
-  {
-    id: 9,
-    name: "채플관",
-    lat: 37.22395225229964,
-    lng: 127.18698596085319,
-    items: [],
-  },
-  { id: 10, name: "창조예술관", lat: 37.2235, lng: 127.1908, items: [] },
-  { id: 11, name: "체육관", lat: 37.2224, lng: 127.1932, items: [] },
-  { id: 12, name: "디자인관", lat: 37.2187, lng: 127.1853, items: [] },
-  { id: 13, name: "방목기념관", lat: 37.2214, lng: 127.1889, items: [] },
-  { id: 14, name: "산학협력관", lat: 37.221, lng: 127.1889, items: [] },
-  { id: 15, name: "차세대과학관", lat: 37.221, lng: 127.1889, items: [] },
-  {
-    id: 16,
-    name: "학생복지관",
-    lat: 37.223225064054425,
-    lng: 127.18672783025089,
-    items: [],
-  },
-  {
-    id: 17,
-    name: "창업보육센터",
-    lat: 37.22296024483864,
-    lng: 127.18609901705975,
-    items: [],
-  },
-  {
-    id: 18,
-    name: "명덕관",
-    lat: 37.22411774471643,
-    lng: 127.18197227736502,
-    items: [],
-  },
-  {
-    id: 19,
-    name: "명현관",
-    lat: 37.2235910492918,
-    lng: 127.18170059088328,
-    items: [],
-  },
-  {
-    id: 20,
-    name: "기숙사3동",
-    lat: 37.22325923176217,
-    lng: 127.18360400156415,
-    items: [],
-  },
-  {
-    id: 21,
-    name: "기숙사4동",
-    lat: 37.22384903960134,
-    lng: 127.1838476843343,
-    items: [],
-  },
-  {
-    id: 22,
-    name: "기숙사5동",
-    lat: 37.223810131953854,
-    lng: 127.18278843765323,
-    items: [],
-  },
-  {
-    id: 23,
-    name: "복지동",
-    lat: 37.22382278553236,
-    lng: 127.18334621334833,
-    items: [],
-  },
-];
-
-const categoryColor: Record<string, string> = {
-  우산: "#6C8BFF",
-  "지갑/카드": "#f59e0b",
-  전자기기: "#10b981",
-  의류: "#f87171",
-  가방: "#a78bfa",
-};
-
-const categoryEmoji: Record<string, string> = {
-  우산: "☂️",
-  "지갑/카드": "💳",
-  전자기기: "🎧",
-  의류: "👕",
-  가방: "🎒",
-};
+function timeAgo(dateStr: string) {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const min = Math.floor(diff / 60000);
+  if (min < 60) return `${min}분 전`;
+  const hour = Math.floor(min / 60);
+  if (hour < 24) return `${hour}시간 전`;
+  return `${Math.floor(hour / 24)}일 전`;
+}
 
 export default function MapScreen() {
   const insets = useSafeAreaInsets();
@@ -173,20 +97,39 @@ export default function MapScreen() {
   } | null>(null);
   const [searchFocused, setSearchFocused] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [buildings, setBuildings] = useState<Building[]>(
+    BASE_BUILDINGS.map((b) => ({ ...b, items: [] })),
+  );
   const router = useRouter();
 
-  const filteredBuildings =
-    searchQuery.trim() === ""
-      ? BUILDINGS
-      : BUILDINGS.filter(
-          (b) =>
-            b.name.includes(searchQuery) ||
-            b.items.some(
-              (item) =>
-                item.title.includes(searchQuery) ||
-                item.category.includes(searchQuery),
-            ),
-        );
+  const fetchAndMapItems = async () => {
+    try {
+      await sendAccessRequest(
+        ITEMS_LIST_URL,
+        JSON.stringify({}),
+        async (res) => {
+          const result = await res.json();
+          const apiItems: ApiItem[] =
+            result.success && result.data?.item_posts?.length > 0
+              ? result.data.item_posts
+              : [];
+          setBuildings(
+            BASE_BUILDINGS.map((b) => ({
+              ...b,
+              items: apiItems.filter((item) => item.building_id === b.id),
+            })),
+          );
+        },
+      );
+    } catch (e) {
+      console.error("분실물 목록 조회 실패", e);
+      setBuildings(BASE_BUILDINGS.map((b) => ({ ...b, items: [] })));
+    }
+  };
+
+  useEffect(() => {
+    fetchAndMapItems();
+  }, []);
 
   useEffect(() => {
     let subscription: Location.LocationSubscription | null = null;
@@ -234,6 +177,18 @@ export default function MapScreen() {
     }
   };
 
+  const filteredItems = selectedBuilding
+    ? selectedBuilding.items.filter((item) => {
+        if (searchQuery.trim() === "") return true;
+        const korCategory = CATEGORY_MAP[item.category] ?? "기타";
+        return (
+          item.title?.includes(searchQuery) ||
+          korCategory.includes(searchQuery) ||
+          item.data_address?.includes(searchQuery)
+        );
+      })
+    : [];
+
   const mapHTML = `
   <!DOCTYPE html>
   <html>
@@ -243,44 +198,9 @@ export default function MapScreen() {
     <style>
       * { margin: 0; padding: 0; box-sizing: border-box; }
       html, body, #map { width: 100%; height: 100%; }
-      .pin-wrap {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        cursor: pointer;
-        position: relative;
-        padding: 12px;
-        margin: -12px;
-      }
-      .pin-circle {
-        width: 12px; height: 12px;
-        border-radius: 50%;
-        border: 2.5px solid #fff;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 11px;
-        font-weight: 700;
-        color: #fff;
-      }
-      .pin-circle.has-items { background: #4F6EF7; }
-      .pin-circle.no-items { background: #C0C0C0; }
-      .pin-label {
-        display: none;
-        position: absolute;
-        bottom: 36px;
-        left: 50%;
-        transform: translateX(-50%);
-        background: #fff;
-        border-radius: 10px;
-        padding: 4px 10px;
-        font-size: 11px;
-        font-weight: 700;
-        color: #111;
-        white-space: nowrap;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-      }
+      .pin-wrap { display: flex; flex-direction: column; align-items: center; cursor: pointer; position: relative; padding: 12px; margin: -12px; }
+      .pin-circle { width: 14px; height: 14px; border-radius: 50%; border: 2.5px solid #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
+      .pin-label { display: none; position: absolute; bottom: 38px; left: 50%; transform: translateX(-50%); background: #fff; border-radius: 10px; padding: 4px 10px; font-size: 11px; font-weight: 700; color: #111; white-space: nowrap; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
       .pin-label.visible { display: block; }
     </style>
   </head>
@@ -289,51 +209,37 @@ export default function MapScreen() {
     <script type="text/javascript" src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=${KAKAO_API_KEY}&autoload=true"></script>
     <script>
       var map = new kakao.maps.Map(document.getElementById('map'), {
-        center: new kakao.maps.LatLng(37.2243, 127.1886),
+        center: new kakao.maps.LatLng(37.22185, 127.1865),
         level: 4
       });
-
-      var buildings = ${JSON.stringify(filteredBuildings)};
+      var buildings = ${JSON.stringify(buildings)};
       var overlays = [];
       var myLocationOverlay = null;
       var activeId = null;
-
-      var CAMPUS_CENTER = new kakao.maps.LatLng(37.2243, 127.1886);
-      var CAMPUS_BOUNDS = { minLat: 37.210, maxLat: 37.232, minLng: 127.175, maxLng: 127.220 };
+      var CAMPUS_CENTER = new kakao.maps.LatLng(37.22185, 127.1865);
+      var CAMPUS_BOUNDS = { minLat: 37.208, maxLat: 37.233, minLng: 127.173, maxLng: 127.210 };
 
       buildings.forEach(function(building) {
         var position = new kakao.maps.LatLng(building.lat, building.lng);
         var hasItems = building.items.length > 0;
-        var circleClass = hasItems ? 'has-items' : 'no-items';
-        var countText = hasItems ? building.items.length : '';
-
+        var pinColor = hasItems ? '#6366f1' : '#ccc';
         var content =
           '<div class="pin-wrap" id="pin-' + building.id + '">' +
             '<div class="pin-label" id="label-' + building.id + '">' + building.name + '</div>' +
-            '<div class="pin-circle ' + circleClass + '">' + countText + '</div>' +
+            '<div class="pin-circle" style="background:' + pinColor + '"></div>' +
           '</div>';
-
-        var overlay = new kakao.maps.CustomOverlay({
-          position: position,
-          content: content,
-          yAnchor: 1.0
-        });
+        var overlay = new kakao.maps.CustomOverlay({ position: position, content: content, yAnchor: 1.0 });
         overlay.setMap(map);
         overlays.push({ overlay: overlay, building: building });
       });
 
       function updateMyLocation(lat, lng) {
         if (myLocationOverlay) myLocationOverlay.setMap(null);
-        var content = '<div style="width:14px;height:14px;background:#4F6EF7;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 4px rgba(79,110,247,0.25);"></div>';
-        myLocationOverlay = new kakao.maps.CustomOverlay({
-          position: new kakao.maps.LatLng(lat, lng),
-          content: content,
-          zIndex: 10
-        });
+        var content = '<div style="width:14px;height:14px;background:#6366f1;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 4px rgba(99,102,241,0.25);"></div>';
+        myLocationOverlay = new kakao.maps.CustomOverlay({ position: new kakao.maps.LatLng(lat, lng), content: content, zIndex: 10 });
         myLocationOverlay.setMap(map);
       }
 
-      // 빈 곳 터치 감지 - touchstart로 빠르게 반응
       document.addEventListener('touchstart', function(e) {
         if (!e.target.closest('.pin-wrap')) {
           if (activeId !== null) {
@@ -358,9 +264,7 @@ export default function MapScreen() {
               var label = document.getElementById('label-' + item.building.id);
               if (label) label.classList.add('visible');
               activeId = item.building.id;
-              window.ReactNativeWebView.postMessage(
-                JSON.stringify({ type: 'BUILDING_CLICK', buildingId: item.building.id })
-              );
+              window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'BUILDING_CLICK', buildingId: item.building.id }));
             });
           }
         });
@@ -368,12 +272,9 @@ export default function MapScreen() {
 
       kakao.maps.event.addListener(map, 'dragend', function() {
         var center = map.getCenter();
-        var lat = center.getLat();
-        var lng = center.getLng();
-        if (lat < CAMPUS_BOUNDS.minLat || lat > CAMPUS_BOUNDS.maxLat ||
-            lng < CAMPUS_BOUNDS.minLng || lng > CAMPUS_BOUNDS.maxLng) {
-          map.setCenter(CAMPUS_CENTER);
-          map.setLevel(4);
+        var lat = center.getLat(); var lng = center.getLng();
+        if (lat < CAMPUS_BOUNDS.minLat || lat > CAMPUS_BOUNDS.maxLat || lng < CAMPUS_BOUNDS.minLng || lng > CAMPUS_BOUNDS.maxLng) {
+          map.setCenter(CAMPUS_CENTER); map.setLevel(4);
         }
       });
     </script>
@@ -381,28 +282,31 @@ export default function MapScreen() {
   </html>
   `;
 
-  const handleMessage = useCallback((event: any) => {
-    try {
-      const data = JSON.parse(event.nativeEvent.data);
-      if (data.type === "BUILDING_CLICK") {
-        Keyboard.dismiss();
-        const building = BUILDINGS.find((b) => b.id === data.buildingId);
-        if (building) {
-          setSelectedBuilding(building);
-          bottomSheetRef.current?.snapToIndex(0);
+  const handleMessage = useCallback(
+    (event: any) => {
+      try {
+        const data = JSON.parse(event.nativeEvent.data);
+        if (data.type === "BUILDING_CLICK") {
+          Keyboard.dismiss();
+          const building = buildings.find((b) => b.id === data.buildingId);
+          if (building) {
+            setSelectedBuilding(building);
+            bottomSheetRef.current?.snapToIndex(0);
+          }
+        } else if (data.type === "MAP_CLICK") {
+          Keyboard.dismiss();
+          bottomSheetRef.current?.close();
+          setSelectedBuilding(null);
         }
-      } else if (data.type === "MAP_CLICK") {
-        Keyboard.dismiss();
-        bottomSheetRef.current?.close();
-        setSelectedBuilding(null);
-      }
-    } catch (e) {}
-  }, []);
+      } catch (e) {}
+    },
+    [buildings],
+  );
 
   return (
     <View style={styles.container}>
-      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-        <Text style={styles.headerTitle}>캠퍼스 분실물</Text>
+      <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
+        <Text style={styles.headerTitle}>캠퍼스 지도</Text>
         <View style={styles.headerIcons}>
           <TouchableOpacity style={styles.iconBtn}>
             <Bell size={20} color="#444" />
@@ -418,7 +322,6 @@ export default function MapScreen() {
 
       <View style={styles.mapContainer}>
         <WebView
-          key={searchQuery}
           ref={webViewRef}
           style={styles.map}
           source={{ html: mapHTML }}
@@ -466,16 +369,15 @@ export default function MapScreen() {
         >
           <Plus size={22} color="#fff" />
         </TouchableOpacity>
-
         <TouchableOpacity style={styles.locationBtn} onPress={moveToMyLocation}>
-          <Crosshair size={18} color={userLocation ? "#4F6EF7" : "#aaa"} />
+          <Crosshair size={18} color={userLocation ? "#6366f1" : "#aaa"} />
         </TouchableOpacity>
       </View>
 
       <BottomSheet
         ref={bottomSheetRef}
         index={-1}
-        snapPoints={["18%", "70%"]}
+        snapPoints={["25%", "70%"]}
         enablePanDownToClose
         backgroundStyle={styles.bottomSheetBg}
         handleIndicatorStyle={styles.indicator}
@@ -496,51 +398,65 @@ export default function MapScreen() {
                     분실물 {selectedBuilding.items.length}건
                   </Text>
                 </View>
-                <TouchableOpacity
-                  style={styles.moreBtn}
-                  onPress={() => {
-                    bottomSheetRef.current?.snapToIndex(-1);
-                    router.push("/(tabs)/lost-item");
-                  }}
-                >
-                  <Text style={styles.moreBtnText}>전체보기</Text>
-                  <ChevronRight size={14} color="#4F6EF7" />
-                </TouchableOpacity>
               </View>
 
-              {selectedBuilding.items.length === 0 ? (
+              {filteredItems.length === 0 ? (
                 <View style={styles.emptyBox}>
-                  <Text style={styles.emptyText}>등록된 분실물이 없어요</Text>
+                  <Text style={styles.emptyText}>
+                    {searchQuery
+                      ? "검색 결과가 없어요"
+                      : "등록된 분실물이 없어요"}
+                  </Text>
                 </View>
               ) : (
-                selectedBuilding.items.map((item) => (
-                  <TouchableOpacity
-                    key={item.id}
-                    style={styles.itemCard}
-                    onPress={() => router.push("/lost-item-detail")}
-                  >
-                    <View
-                      style={[
-                        styles.itemThumb,
-                        {
-                          backgroundColor: categoryColor[item.category] + "15",
-                        },
-                      ]}
+                filteredItems.map((item) => {
+                  const korCategory = CATEGORY_MAP[item.category] ?? "기타";
+                  const korStatus = TYPE_MAP[item.type] ?? item.type;
+                  const dotColor = statusDotColor[item.type] ?? "#aaa";
+                  const IconComponent = categoryIconMap[korCategory] ?? Package;
+                  const buildingName =
+                    BASE_BUILDINGS.find((b) => b.id === item.building_id)
+                      ?.name ?? "";
+                  return (
+                    <TouchableOpacity
+                      key={item.id}
+                      style={styles.itemCard}
+                      onPress={() =>
+                        router.push(`/lost-item-detail?id=${item.id}`)
+                      }
                     >
-                      <Text style={{ fontSize: 22 }}>
-                        {categoryEmoji[item.category] ?? "📦"}
-                      </Text>
-                    </View>
-                    <View style={styles.itemInfo}>
-                      <Text style={styles.itemCategory}>
-                        {item.category} · {item.time}
-                      </Text>
-                      <Text style={styles.itemTitle}>{item.title}</Text>
-                      <Text style={styles.itemMeta}>{item.location}</Text>
-                    </View>
-                    <ChevronRight size={16} color="#ccc" />
-                  </TouchableOpacity>
-                ))
+                      <View style={styles.itemThumb}>
+                        <IconComponent size={22} color="#6366f1" />
+                      </View>
+                      <View style={styles.itemInfo}>
+                        <Text style={styles.itemCategory}>{korCategory}</Text>
+                        <Text style={styles.itemTitle} numberOfLines={1}>
+                          {item.title ||
+                            `${buildingName} ${item.data_address ?? ""}`}
+                        </Text>
+                        <Text style={styles.itemMeta}>
+                          {timeAgo(item.created_at)}
+                        </Text>
+                      </View>
+                      <View style={styles.itemRight}>
+                        <View style={styles.statusBadge}>
+                          <View
+                            style={[
+                              styles.statusDot,
+                              { backgroundColor: dotColor },
+                            ]}
+                          />
+                          <Text style={styles.statusText}>{korStatus}</Text>
+                        </View>
+                        <ChevronRight
+                          size={14}
+                          color="#ccc"
+                          style={{ marginTop: 4 }}
+                        />
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })
               )}
             </>
           )}
@@ -557,7 +473,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 20,
-    paddingBottom: 10,
+    paddingVertical: 10,
     backgroundColor: "#fff",
   },
   headerTitle: { fontSize: 18, color: "#111", fontFamily: fonts.bold },
@@ -566,7 +482,6 @@ const styles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 10,
-    backgroundColor: "#f5f6f8",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -603,10 +518,10 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 14,
-    backgroundColor: "#4F6EF7",
+    backgroundColor: "#6366f1",
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#4F6EF7",
+    shadowColor: "#6366f1",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.35,
     shadowRadius: 8,
@@ -655,47 +570,50 @@ const styles = StyleSheet.create({
     color: "#aaa",
     marginTop: 2,
   },
-  moreBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 2,
-    backgroundColor: "#f0f4ff",
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 10,
-  },
-  moreBtnText: { fontSize: 12, color: "#4F6EF7", fontFamily: fonts.medium },
   emptyBox: { alignItems: "center", paddingVertical: 40 },
   emptyText: { fontSize: 14, color: "#aaa", fontFamily: fonts.regular },
   itemCard: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#fff",
-    borderRadius: 14,
-    paddingVertical: 12,
+    paddingVertical: 14,
     borderBottomWidth: 1,
     borderBottomColor: "#f5f5f5",
     gap: 12,
   },
   itemThumb: {
-    width: 52,
-    height: 52,
-    borderRadius: 14,
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: "#eef2ff",
     alignItems: "center",
     justifyContent: "center",
+    borderWidth: 1.5,
+    borderColor: "#6366f130",
   },
   itemInfo: { flex: 1 },
   itemCategory: {
     fontSize: 11,
-    color: "#aaa",
+    color: "#bbb",
     fontFamily: fonts.regular,
     marginBottom: 3,
   },
   itemTitle: {
-    fontSize: 15,
+    fontSize: 14,
     fontFamily: fonts.bold,
-    color: "#222",
-    marginBottom: 2,
+    color: "#111",
+    marginBottom: 3,
   },
-  itemMeta: { fontSize: 12, fontFamily: fonts.regular, color: "#aaa" },
+  itemMeta: { fontSize: 11, fontFamily: fonts.regular, color: "#bbb" },
+  itemRight: { alignItems: "flex-end", gap: 2 },
+  statusBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#f5f6f8",
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    gap: 4,
+  },
+  statusDot: { width: 5, height: 5, borderRadius: 3 },
+  statusText: { fontSize: 10, fontFamily: fonts.bold, color: "#555" },
 });

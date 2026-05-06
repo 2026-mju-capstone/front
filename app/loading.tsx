@@ -21,7 +21,10 @@ export default function LoadingScreen() {
 
         const result = await authService.validateToken();
         if (result.success) {
-          await AsyncStorage.setItem("token", result.data); // 신규 토큰 저장
+          // 서버에서 새 토큰을 내려준다면 저장 (선택 사항)
+          if (result.data) {
+            await AsyncStorage.setItem("token", result.data);
+          }
           router.replace("/(tabs)/map");
         } else {
           await AsyncStorage.removeItem("token");

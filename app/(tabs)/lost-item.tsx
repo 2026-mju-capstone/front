@@ -1,11 +1,29 @@
+import { BASE_BUILDINGS } from "@/constants/buildings";
+import { CATEGORY_MAP, CATEGORY_TO_API } from "@/constants/categories";
 import { fonts } from "@/constants/typography";
+import { ITEMS_LIST_URL } from "@/constants/url";
+import { sendAccessRequest } from "@/utils/api";
 import { useRouter } from "expo-router";
-import { ChevronDown, MapPin, Plus, Search, X } from "lucide-react-native";
-import { useState } from "react";
 import {
+  Bell,
+  Book,
+  ChevronDown,
+  CreditCard,
+  Headphones,
+  MapPin,
+  Package,
+  Plus,
+  Search,
+  Umbrella,
+  User,
+  X,
+} from "lucide-react-native";
+import { useEffect, useState } from "react";
+import {
+  ActivityIndicator,
   FlatList,
-  Modal,
-  ScrollView,
+  Image,
+  RefreshControl,
   StyleSheet,
   Text,
   TextInput,
@@ -15,351 +33,455 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-const STATUS_OPTIONS = ["전체", "찾는중", "발견됨"];
-const CATEGORY_OPTIONS = ["전체", "지갑", "전자기기", "의류", "신분증", "기타"];
+const TYPE_MAP: Record<string, string> = { LOST: "찾는중", FOUND: "발견됨" };
 
-const categoryColor: Record<string, string> = {
-  지갑: "#f59e0b",
-  전자기기: "#10b981",
-  의류: "#f87171",
-  신분증: "#6C8BFF",
-  기타: "#a78bfa",
-};
-
-const categoryEmoji: Record<string, string> = {
-  지갑: "💳",
-  전자기기: "🎧",
-  의류: "👕",
-  신분증: "🪪",
-  기타: "📦",
-};
-
-const DUMMY_ITEMS = [
-  {
-    id: 1,
-    title: "검정 우산",
-    category: "기타",
-    location: "제1공학관 · 1층 로비",
-    time: "2시간 전",
-    status: "찾는중",
-  },
-  {
-    id: 2,
-    title: "학생증",
-    category: "신분증",
-    location: "제1공학관 · 3층 강의실",
-    time: "1일 전",
-    status: "찾는중",
-  },
-  {
-    id: 3,
-    title: "공학용 계산기",
-    category: "전자기기",
-    location: "제3공학관 · 2층 강의실",
-    time: "1시간 전",
-    status: "발견됨",
-  },
-  {
-    id: 4,
-    title: "텀블러",
-    category: "기타",
-    location: "제3공학관 · 3층 복도",
-    time: "6시간 전",
-    status: "찾는중",
-  },
-  {
-    id: 5,
-    title: "무선 마우스",
-    category: "전자기기",
-    location: "제3공학관 · 실습실 305",
-    time: "1일 전",
-    status: "발견됨",
-  },
-  {
-    id: 6,
-    title: "지갑",
-    category: "지갑",
-    location: "학생회관 · 1층",
-    time: "3시간 전",
-    status: "찾는중",
-  },
-  {
-    id: 7,
-    title: "패딩 점퍼",
-    category: "의류",
-    location: "명진당 · 2층",
-    time: "2일 전",
-    status: "찾는중",
-  },
+const CATEGORY_OPTIONS = [
+  "전체",
+  "스마트폰",
+  "이어폰",
+  "가방",
+  "지갑",
+  "카드",
+  "학생증",
+  "교재",
+  "노트",
+  "우산",
+  "물병",
+  "필통",
+  "인형",
 ];
+const STATUS_OPTIONS = ["전체", "찾는중", "발견됨"];
+
+const categoryIconMap: Record<string, any> = {
+  스마트폰: Headphones,
+  이어폰: Headphones,
+  가방: Package,
+  지갑: CreditCard,
+  카드: CreditCard,
+  학생증: CreditCard,
+  교재: Book,
+  노트: Book,
+  우산: Umbrella,
+  물병: Package,
+  필통: Package,
+  인형: Package,
+};
+
+const statusDotColor: Record<string, string> = {
+  LOST: "#f97316",
+  FOUND: "#22c55e",
+};
+
+type Item = {
+  id: number;
+  type: string;
+  status: string;
+  category: string;
+  image_url?: string;
+  building_id: number;
+  data_address?: string;
+  created_at: string;
+  title?: string;
+};
+
+function timeAgo(dateStr: string) {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const min = Math.floor(diff / 60000);
+  if (min < 60) return `${min}분 전`;
+  const hour = Math.floor(min / 60);
+  if (hour < 24) return `${hour}시간 전`;
+  return `${Math.floor(hour / 24)}일 전`;
+}
 
 export default function LostItemBoard() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const [status, setStatus] = useState("전체");
+  const [typeFilter, setTypeFilter] = useState("전체");
   const [category, setCategory] = useState("전체");
   const [searchQuery, setSearchQuery] = useState("");
-  const [showStatusModal, setShowStatusModal] = useState(false);
-  const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [showStatusDropdown, setShowStatusDropdown] = useState(false);
+  const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
+  const [items, setItems] = useState<Item[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [isFetchingMore, setIsFetchingMore] = useState(false);
 
-  const filtered = DUMMY_ITEMS.filter((item) => {
-    const matchStatus = status === "전체" || item.status === status;
-    const matchCategory = category === "전체" || item.category === category;
+  useEffect(() => {
+    setPage(0);
+    setHasMore(true);
+    fetchItems(0);
+  }, [typeFilter, category]);
+
+  const fetchItems = async (pageNum = 0) => {
+    if (pageNum === 0) setIsLoading(true);
+    else setIsFetchingMore(true);
+    try {
+      const filterBody: Record<string, string> = {};
+      if (typeFilter === "찾는중") filterBody.status = "REPORTED";
+      if (CATEGORY_TO_API[category])
+        filterBody.category = CATEGORY_TO_API[category];
+
+      await sendAccessRequest(
+        `${ITEMS_LIST_URL}?page=${pageNum}&size=20`,
+        JSON.stringify(filterBody),
+        async (res) => {
+          const result = await res.json();
+          if (result.success && result.data?.item_posts?.length > 0) {
+            const newItems = result.data.item_posts;
+            setItems((prev) =>
+              pageNum === 0 ? newItems : [...prev, ...newItems],
+            );
+            setHasMore(newItems.length === 20);
+            setPage(pageNum);
+          } else {
+            if (pageNum === 0) setItems([]);
+            setHasMore(false);
+          }
+        },
+      );
+    } catch (e) {
+      console.error("분실물 목록 조회 실패", e);
+      if (pageNum === 0) setItems([]);
+    } finally {
+      setIsLoading(false);
+      setIsFetchingMore(false);
+      setIsRefreshing(false);
+    }
+  };
+
+  const filtered = items.filter((item) => {
+    const korCategory = CATEGORY_MAP[item.category] ?? "기타";
+    const buildingName =
+      BASE_BUILDINGS.find((b) => b.id === item.building_id)?.name ?? "";
+    const matchType =
+      typeFilter === "전체" ||
+      (typeFilter === "찾는중" && item.type === "LOST") ||
+      (typeFilter === "발견됨" && item.type === "FOUND");
+    const matchCategory =
+      category === "전체" || CATEGORY_TO_API[category] === item.category;
     const matchSearch =
       searchQuery === "" ||
-      item.title.includes(searchQuery) ||
-      item.location.includes(searchQuery);
-    return matchStatus && matchCategory && matchSearch;
+      item.title?.includes(searchQuery) ||
+      korCategory.includes(searchQuery) ||
+      buildingName.includes(searchQuery) ||
+      item.data_address?.includes(searchQuery);
+    return matchType && matchCategory && matchSearch;
   });
 
-  const DropdownModal = ({
-    visible,
-    options,
-    selected,
-    onSelect,
-    onClose,
-  }: {
-    visible: boolean;
-    options: string[];
-    selected: string;
-    onSelect: (v: string) => void;
-    onClose: () => void;
-  }) => (
-    <Modal visible={visible} transparent animationType="fade">
-      <TouchableWithoutFeedback onPress={onClose}>
-        <View style={styles.modalOverlay}>
-          <TouchableWithoutFeedback>
-            <View style={styles.modalBox}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>선택</Text>
-                <TouchableOpacity onPress={onClose}>
-                  <X size={20} color="#333" />
-                </TouchableOpacity>
-              </View>
-              <ScrollView>
-                {options.map((option) => (
+  const closeDropdowns = () => {
+    setShowStatusDropdown(false);
+    setShowCategoryDropdown(false);
+  };
+
+  const onRefresh = async () => {
+    setIsRefreshing(true);
+    setHasMore(true);
+    setPage(0);
+    await fetchItems(0);
+  };
+
+  const loadMore = () => {
+    if (!hasMore || isFetchingMore || isLoading) return;
+    fetchItems(page + 1);
+  };
+
+  return (
+    <TouchableWithoutFeedback onPress={closeDropdowns}>
+      <View style={[styles.container, { paddingTop: insets.top }]}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>분실물 게시판</Text>
+          <View style={styles.headerIcons}>
+            <TouchableOpacity style={styles.iconBtn}>
+              <Bell size={20} color="#444" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.iconBtn}>
+              <User size={20} color="#444" />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View style={styles.searchBar}>
+          <Search size={15} color="#aaa" />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="물품명, 카테고리, 장소 검색"
+            placeholderTextColor="#bbb"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            autoCorrect={false}
+            autoCapitalize="none"
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery("")}>
+              <X size={14} color="#aaa" />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        <View style={styles.filterRow}>
+          <View>
+            <TouchableOpacity
+              style={[
+                styles.filterBtn,
+                typeFilter !== "전체" && styles.filterBtnActive,
+              ]}
+              onPress={() => {
+                setShowStatusDropdown((v) => !v);
+                setShowCategoryDropdown(false);
+              }}
+            >
+              <Text
+                style={[
+                  styles.filterBtnText,
+                  typeFilter !== "전체" && styles.filterBtnTextActive,
+                ]}
+              >
+                {typeFilter === "전체" ? "상태" : typeFilter}
+              </Text>
+              <ChevronDown
+                size={12}
+                color={typeFilter !== "전체" ? "#6366f1" : "#999"}
+              />
+            </TouchableOpacity>
+            {showStatusDropdown && (
+              <View style={styles.dropdown}>
+                {STATUS_OPTIONS.map((option) => (
                   <TouchableOpacity
                     key={option}
                     style={[
-                      styles.modalOption,
-                      selected === option && styles.modalOptionActive,
+                      styles.dropdownItem,
+                      typeFilter === option && styles.dropdownItemActive,
                     ]}
                     onPress={() => {
-                      onSelect(option);
-                      onClose();
+                      setTypeFilter(option);
+                      setShowStatusDropdown(false);
                     }}
                   >
                     <Text
                       style={[
-                        styles.modalOptionText,
-                        selected === option && styles.modalOptionTextActive,
+                        styles.dropdownItemText,
+                        typeFilter === option && styles.dropdownItemTextActive,
                       ]}
                     >
                       {option}
                     </Text>
-                    {selected === option && (
-                      <View style={styles.modalOptionDot} />
-                    )}
                   </TouchableOpacity>
                 ))}
-              </ScrollView>
-            </View>
-          </TouchableWithoutFeedback>
-        </View>
-      </TouchableWithoutFeedback>
-    </Modal>
-  );
-
-  return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      {/* 헤더 */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>분실물 게시판</Text>
-      </View>
-
-      {/* 검색창 */}
-      <View style={styles.searchBar}>
-        <Search size={15} color="#aaa" />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="제목, 장소 검색"
-          placeholderTextColor="#bbb"
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          autoCorrect={false}
-          autoCapitalize="none"
-        />
-        {searchQuery.length > 0 && (
-          <TouchableOpacity onPress={() => setSearchQuery("")}>
-            <Text style={{ fontSize: 18, color: "#aaa" }}>×</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-
-      {/* 드롭다운 필터 */}
-      <View style={styles.filterRow}>
-        <TouchableOpacity
-          style={[
-            styles.filterBtn,
-            status !== "전체" && styles.filterBtnActive,
-          ]}
-          onPress={() => setShowStatusModal(true)}
-        >
-          <Text
-            style={[
-              styles.filterBtnText,
-              status !== "전체" && styles.filterBtnTextActive,
-            ]}
-          >
-            {status === "전체" ? "상태" : status}
-          </Text>
-          <ChevronDown
-            size={14}
-            color={status !== "전체" ? "#4F6EF7" : "#aaa"}
-          />
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[
-            styles.filterBtn,
-            category !== "전체" && styles.filterBtnActive,
-          ]}
-          onPress={() => setShowCategoryModal(true)}
-        >
-          <Text
-            style={[
-              styles.filterBtnText,
-              category !== "전체" && styles.filterBtnTextActive,
-            ]}
-          >
-            {category === "전체" ? "카테고리" : category}
-          </Text>
-          <ChevronDown
-            size={14}
-            color={category !== "전체" ? "#4F6EF7" : "#aaa"}
-          />
-        </TouchableOpacity>
-
-        {(status !== "전체" || category !== "전체") && (
-          <TouchableOpacity
-            style={styles.resetBtn}
-            onPress={() => {
-              setStatus("전체");
-              setCategory("전체");
-            }}
-          >
-            <Text style={styles.resetBtnText}>초기화</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-
-      {/* 분실물 리스트 */}
-      <FlatList
-        data={filtered}
-        keyExtractor={(item) => String(item.id)}
-        contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={false}
-        ListEmptyComponent={
-          <View style={styles.emptyBox}>
-            <Text style={styles.emptyText}>등록된 분실물이 없어요</Text>
+              </View>
+            )}
           </View>
-        }
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={styles.itemCard}
-            onPress={() => router.push("/lost-item-detail")}
-          >
-            <View
+
+          <View>
+            <TouchableOpacity
               style={[
-                styles.itemThumb,
-                {
-                  backgroundColor:
-                    (categoryColor[item.category] ?? "#aaa") + "20",
-                },
+                styles.filterBtn,
+                category !== "전체" && styles.filterBtnActive,
               ]}
+              onPress={() => {
+                setShowCategoryDropdown((v) => !v);
+                setShowStatusDropdown(false);
+              }}
             >
-              <Text style={{ fontSize: 24 }}>
-                {categoryEmoji[item.category] ?? "📦"}
+              <Text
+                style={[
+                  styles.filterBtnText,
+                  category !== "전체" && styles.filterBtnTextActive,
+                ]}
+              >
+                {category === "전체" ? "카테고리" : category}
               </Text>
-            </View>
-            <View style={styles.itemInfo}>
-              <View style={styles.itemTopRow}>
-                <Text
-                  style={[
-                    styles.itemCategory,
-                    { color: categoryColor[item.category] ?? "#aaa" },
-                  ]}
-                >
-                  {item.category}
-                </Text>
-                <Text
-                  style={[
-                    styles.itemStatus,
-                    {
-                      backgroundColor:
-                        item.status === "발견됨" ? "#dcfce7" : "#fef3c7",
-                    },
-                  ]}
-                >
-                  {item.status}
-                </Text>
+              <ChevronDown
+                size={12}
+                color={category !== "전체" ? "#6366f1" : "#999"}
+              />
+            </TouchableOpacity>
+            {showCategoryDropdown && (
+              <View style={styles.dropdown}>
+                {CATEGORY_OPTIONS.map((option) => (
+                  <TouchableOpacity
+                    key={option}
+                    style={[
+                      styles.dropdownItem,
+                      category === option && styles.dropdownItemActive,
+                    ]}
+                    onPress={() => {
+                      setCategory(option);
+                      setShowCategoryDropdown(false);
+                    }}
+                  >
+                    <Text
+                      style={[
+                        styles.dropdownItemText,
+                        category === option && styles.dropdownItemTextActive,
+                      ]}
+                    >
+                      {option}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
               </View>
-              <Text style={styles.itemTitle}>{item.title}</Text>
-              <View style={styles.itemMetaRow}>
-                <MapPin size={11} color="#aaa" />
-                <Text style={styles.itemMeta}>
-                  {item.location} · {item.time}
-                </Text>
+            )}
+          </View>
+
+          {(typeFilter !== "전체" || category !== "전체") && (
+            <TouchableOpacity
+              style={styles.resetBtn}
+              onPress={() => {
+                setTypeFilter("전체");
+                setCategory("전체");
+              }}
+            >
+              <X size={11} color="#999" />
+              <Text style={styles.resetBtnText}>초기화</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {isLoading ? (
+          <View style={styles.loadingBox}>
+            <ActivityIndicator color="#6366f1" />
+          </View>
+        ) : (
+          <FlatList
+            data={filtered}
+            keyExtractor={(item) => String(item.id)}
+            contentContainerStyle={styles.listContent}
+            showsVerticalScrollIndicator={false}
+            onScrollBeginDrag={closeDropdowns}
+            onEndReached={loadMore}
+            onEndReachedThreshold={0.3}
+            refreshControl={
+              <RefreshControl
+                refreshing={isRefreshing}
+                onRefresh={onRefresh}
+                colors={["#6366f1"]}
+                tintColor="#6366f1"
+              />
+            }
+            ListEmptyComponent={
+              <View style={styles.emptyBox}>
+                <Text style={styles.emptyText}>등록된 분실물이 없어요</Text>
               </View>
-            </View>
-          </TouchableOpacity>
+            }
+            ListFooterComponent={
+              isFetchingMore ? (
+                <ActivityIndicator
+                  color="#6366f1"
+                  style={{ paddingVertical: 20 }}
+                />
+              ) : null
+            }
+            renderItem={({ item }) => {
+              const korCategory = CATEGORY_MAP[item.category] ?? "기타";
+              const korStatus = TYPE_MAP[item.type] ?? item.type;
+              const dotColor = statusDotColor[item.type] ?? "#aaa";
+              const IconComponent = categoryIconMap[korCategory] ?? Package;
+              const buildingName =
+                BASE_BUILDINGS.find((b) => b.id === item.building_id)?.name ??
+                "";
+              const locationText = item.data_address
+                ? `${buildingName} · ${item.data_address}`
+                : buildingName;
+              return (
+                <TouchableOpacity
+                  style={styles.itemCard}
+                  onPress={() => {
+                    closeDropdowns();
+                    router.push(`/lost-item-detail?id=${item.id}`);
+                  }}
+                  activeOpacity={0.6}
+                >
+                  {item.image_url ? (
+                    <Image
+                      source={{ uri: item.image_url }}
+                      style={styles.itemThumbImage}
+                      resizeMode="cover"
+                    />
+                  ) : (
+                    <View style={styles.itemThumb}>
+                      <IconComponent size={30} color="#6366f1" />
+                    </View>
+                  )}
+                  <View style={styles.itemInfo}>
+                    <Text style={styles.itemCategory}>{korCategory}</Text>
+                    <Text style={styles.itemTitle} numberOfLines={1}>
+                      {item.title || locationText}
+                    </Text>
+                    <View style={styles.itemMetaRow}>
+                      <MapPin size={11} color="#bbb" />
+                      <Text style={styles.itemMeta} numberOfLines={1}>
+                        {locationText}
+                      </Text>
+                    </View>
+                    <Text style={styles.itemTime}>
+                      {timeAgo(item.created_at)}
+                    </Text>
+                  </View>
+                  <View style={styles.itemRight}>
+                    <View style={styles.statusBadge}>
+                      <View
+                        style={[
+                          styles.statusDot,
+                          { backgroundColor: dotColor },
+                        ]}
+                      />
+                      <Text style={styles.statusText}>{korStatus}</Text>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              );
+            }}
+          />
         )}
-      />
 
-      {/* 플로팅 버튼 */}
-      <TouchableOpacity
-        style={[styles.fab, { bottom: insets.bottom + 16 }]}
-        onPress={() => router.push("/lost-item-register")}
-      >
-        <Plus size={20} color="#fff" />
-        <Text style={styles.fabText}>분실물 등록</Text>
-      </TouchableOpacity>
-
-      <DropdownModal
-        visible={showStatusModal}
-        options={STATUS_OPTIONS}
-        selected={status}
-        onSelect={setStatus}
-        onClose={() => setShowStatusModal(false)}
-      />
-      <DropdownModal
-        visible={showCategoryModal}
-        options={CATEGORY_OPTIONS}
-        selected={category}
-        onSelect={setCategory}
-        onClose={() => setShowCategoryModal(false)}
-      />
-    </View>
+        <TouchableOpacity
+          style={[styles.fab, { bottom: insets.bottom + 10 }]}
+          onPress={() => router.push("/lost-item-register")}
+        >
+          <Plus size={18} color="#fff" />
+          <Text style={styles.fabText}>분실물 등록</Text>
+        </TouchableOpacity>
+      </View>
+    </TouchableWithoutFeedback>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#fff" },
   header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: 20,
-    paddingVertical: 12,
+    paddingVertical: 10,
+    backgroundColor: "#fff",
   },
   headerTitle: { fontSize: 18, fontFamily: fonts.bold, color: "#111" },
+  headerIcons: { flexDirection: "row", gap: 6 },
+  iconBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   searchBar: {
     flexDirection: "row",
     alignItems: "center",
-    marginHorizontal: 16,
+    marginHorizontal: 12,
     marginBottom: 10,
     paddingHorizontal: 14,
-    height: 42,
-    backgroundColor: "#f5f6f8",
-    borderRadius: 12,
+    height: 44,
+    backgroundColor: "#fff",
+    borderRadius: 14,
     gap: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
   },
   searchInput: {
     flex: 1,
@@ -373,63 +495,92 @@ const styles = StyleSheet.create({
     paddingBottom: 10,
     gap: 8,
     alignItems: "center",
+    zIndex: 100,
   },
   filterBtn: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: "#f5f6f8",
+    paddingHorizontal: 11,
+    paddingVertical: 6,
+    borderRadius: 10,
     borderWidth: 1.5,
-    borderColor: "transparent",
-    gap: 4,
+    borderColor: "#e5e7eb",
+    backgroundColor: "#fff",
+    gap: 3,
   },
-  filterBtnActive: { backgroundColor: "#EEF1FE", borderColor: "#4F6EF7" },
-  filterBtnText: { fontSize: 13, fontFamily: fonts.medium, color: "#aaa" },
-  filterBtnTextActive: { color: "#4F6EF7", fontFamily: fonts.bold },
-  resetBtn: { paddingHorizontal: 10, paddingVertical: 8 },
-  resetBtnText: { fontSize: 12, color: "#aaa", fontFamily: fonts.regular },
-  listContent: { paddingHorizontal: 16, paddingBottom: 100 },
+  filterBtnActive: { backgroundColor: "#eef2ff", borderColor: "#6366f1" },
+  filterBtnText: { fontSize: 12, fontFamily: fonts.bold, color: "#999" },
+  filterBtnTextActive: { color: "#6366f1" },
+  dropdown: {
+    position: "absolute",
+    top: 38,
+    left: 0,
+    backgroundColor: "#fff",
+    borderRadius: 10,
+    minWidth: 110,
+    zIndex: 999,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 8,
+    overflow: "hidden",
+  },
+  dropdownItem: { paddingHorizontal: 16, paddingVertical: 11 },
+  dropdownItemActive: { backgroundColor: "#eef2ff" },
+  dropdownItemText: { fontSize: 13, fontFamily: fonts.bold, color: "#666" },
+  dropdownItemTextActive: { color: "#6366f1" },
+  resetBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: "#e5e7eb",
+    backgroundColor: "#fff",
+    gap: 3,
+  },
+  resetBtnText: { fontSize: 11, color: "#999", fontFamily: fonts.bold },
+  loadingBox: { flex: 1, alignItems: "center", justifyContent: "center" },
+  listContent: { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 100 },
   itemCard: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 14,
+    paddingVertical: 20,
+    gap: 14,
     borderBottomWidth: 1,
-    borderBottomColor: "#f5f5f5",
-    gap: 12,
+    borderBottomColor: "#f3f4f6",
   },
   itemThumb: {
-    width: 56,
-    height: 56,
+    width: 100,
+    height: 100,
     borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
+    backgroundColor: "#eef2ff",
+    borderWidth: 1.5,
+    borderColor: "#6366f130",
   },
-  itemInfo: { flex: 1 },
-  itemTopRow: {
+  itemThumbImage: { width: 100, height: 100, borderRadius: 14 },
+  itemInfo: { flex: 1, gap: 4 },
+  itemCategory: { fontSize: 11, fontFamily: fonts.regular, color: "#bbb" },
+  itemTitle: { fontSize: 15, fontFamily: fonts.bold, color: "#111" },
+  itemMetaRow: { flexDirection: "row", alignItems: "center", gap: 3 },
+  itemMeta: { fontSize: 12, fontFamily: fonts.regular, color: "#bbb", flex: 1 },
+  itemTime: { fontSize: 11, fontFamily: fonts.regular, color: "#ccc" },
+  itemRight: { alignItems: "flex-end" },
+  statusBadge: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 4,
-  },
-  itemCategory: { fontSize: 11, fontFamily: fonts.regular, color: "#aaa" },
-  itemStatus: {
-    fontSize: 11,
-    fontFamily: fonts.medium,
+    backgroundColor: "#f5f6f8",
+    borderRadius: 8,
     paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 20,
-    color: "#555",
+    paddingVertical: 4,
+    gap: 4,
   },
-  itemTitle: {
-    fontSize: 15,
-    fontFamily: fonts.bold,
-    color: "#111",
-    marginBottom: 4,
-  },
-  itemMetaRow: { flexDirection: "row", alignItems: "center", gap: 4 },
-  itemMeta: { fontSize: 12, fontFamily: fonts.regular, color: "#aaa" },
+  statusDot: { width: 6, height: 6, borderRadius: 3 },
+  statusText: { fontSize: 11, fontFamily: fonts.bold, color: "#555" },
   emptyBox: { alignItems: "center", paddingVertical: 60 },
   emptyText: { fontSize: 14, color: "#aaa", fontFamily: fonts.regular },
   fab: {
@@ -437,56 +588,16 @@ const styles = StyleSheet.create({
     right: 16,
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#4F6EF7",
-    paddingHorizontal: 18,
+    backgroundColor: "#6366f1",
+    paddingHorizontal: 15,
     paddingVertical: 12,
-    borderRadius: 16,
+    borderRadius: 14,
     gap: 6,
-    shadowColor: "#4F6EF7",
+    shadowColor: "#6366f1",
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
+    shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 6,
   },
   fabText: { fontSize: 14, fontFamily: fonts.bold, color: "#fff" },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.4)",
-    justifyContent: "flex-end",
-  },
-  modalBox: {
-    backgroundColor: "#fff",
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingBottom: 32,
-    maxHeight: 400,
-  },
-  modalHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
-  },
-  modalTitle: { fontSize: 16, fontFamily: fonts.bold, color: "#111" },
-  modalOption: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "#f5f5f5",
-  },
-  modalOptionActive: { backgroundColor: "#f0f4ff" },
-  modalOptionText: { fontSize: 15, fontFamily: fonts.regular, color: "#333" },
-  modalOptionTextActive: { color: "#4F6EF7", fontFamily: fonts.bold },
-  modalOptionDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: "#4F6EF7",
-  },
 });

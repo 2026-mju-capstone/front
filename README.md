@@ -1,5 +1,3 @@
-
-````md
 # 프런트 개발환경 세팅 가이드
 
 > Android용 가이드입니다.  
@@ -17,7 +15,7 @@
 
 ```bash
 node -v
-````
+```
 
 `v24.14.1` 이상이면 OK
 
@@ -26,14 +24,13 @@ node -v
 ### 2. Android Studio 설치
 
 안드로이드 기기에 직접 앱을 설치해서 실행하기 위해 필요합니다.
-
 👉 [https://developer.android.com/studio](https://developer.android.com/studio)
 
 설치 후 아래 항목이 포함되어 있는지 확인해주세요.
 
-* Android SDK
-* Android SDK Platform-Tools
-* Android Emulator
+- Android SDK
+- Android SDK Platform-Tools
+- Android Emulator
 
 ---
 
@@ -65,6 +62,15 @@ cd front
 ```bash
 npm install
 ```
+
+> ⚠️ 이 프로젝트는 네이티브 모듈을 사용합니다.
+> `npm install` 후 반드시 `npx expo run:android` 로 앱을 빌드해야 정상 동작합니다.
+> 아래 패키지들이 네이티브 빌드를 필요로 합니다:
+>
+> - `expo-media-library` (갤러리 접근)
+> - `expo-image-picker` (카메라/갤러리)
+> - `@react-native-community/datetimepicker` (날짜/시간 선택)
+> - `@react-native-picker/picker` (스크롤 휠 선택)
 
 ---
 
@@ -101,7 +107,6 @@ Mac: `Cmd + S`
 ## 📱 앱 실행 방법
 
 현재 프로젝트는 Expo Go 앱에서 QR을 스캔해서 실행하는 방식이 아닙니다.
-
 개발용 앱을 휴대폰에 직접 설치한 뒤 실행해야 합니다.
 
 ---
@@ -118,18 +123,31 @@ npx expo run:android
 처음 실행하면 휴대폰에 개발용 앱이 설치됩니다.
 이후에는 설치된 앱을 실행해서 개발 화면에 진입할 수 있습니다.
 
+> ⚠️ 네이티브 패키지를 새로 설치한 경우 반드시 `npx expo run:android` 를 다시 실행해야 합니다.
+> `npx expo start` 만으로는 네이티브 모듈이 반영되지 않습니다.
+
 ---
 
+## 📷 앱 권한 안내
+
+앱 실행 후 아래 권한 요청이 발생할 수 있습니다.
+정상 동작을 위해 모두 허용해주세요.
+
+- **카메라** - 분실물 사진 촬영
+- **사진/미디어** - 갤러리에서 사진 선택
+- **위치** - 캠퍼스 지도에서 내 위치 표시
+
+---
 
 ## ❗ 주의사항
 
-* Expo Go 앱으로는 실행되지 않습니다.
-* 웹 QR을 스캔해도 바로 접속되지 않을 수 있습니다.
-* 반드시 `npx expo run:android` 로 개발용 앱을 설치해야 합니다.
-* 휴대폰과 개발 PC는 같은 와이파이에 연결되어 있어야 합니다.
-* 학교 와이파이처럼 기기 간 통신이 막힌 환경에서는 연결이 안 될 수 있습니다.
-* 연결이 안 될 경우 핫스팟을 사용해보세요.
-* USB 연결 시 휴대폰에서 “USB 디버깅 허용”을 눌러야 합니다.
+- Expo Go 앱으로는 실행되지 않습니다.
+- 웹 QR을 스캔해도 바로 접속되지 않을 수 있습니다.
+- 반드시 `npx expo run:android` 로 개발용 앱을 설치해야 합니다.
+- 휴대폰과 개발 PC는 같은 와이파이에 연결되어 있어야 합니다.
+- 학교 와이파이처럼 기기 간 통신이 막힌 환경에서는 연결이 안 될 수 있습니다.
+- 연결이 안 될 경우 핫스팟을 사용해보세요.
+- USB 연결 시 휴대폰에서 "USB 디버깅 허용"을 눌러야 합니다.
 
 ---
 
@@ -159,9 +177,19 @@ npx expo run:android
 
 아래 내용을 확인해주세요.
 
-* USB 디버깅이 켜져 있는지
-* 휴대폰에서 USB 디버깅 허용을 눌렀는지
-* Android Studio / SDK / Platform-Tools가 설치되어 있는지
-* USB 케이블이 데이터 전송을 지원하는지
+- USB 디버깅이 켜져 있는지
+- 휴대폰에서 USB 디버깅 허용을 눌렀는지
+- Android Studio / SDK / Platform-Tools가 설치되어 있는지
+- USB 케이블이 데이터 전송을 지원하는지
 
+---
+
+### 네이티브 모듈 오류가 떠요 (Cannot find native module)
+
+새로운 네이티브 패키지가 추가된 경우입니다.
+
+```bash
+npx expo run:android
 ```
+
+위 명령어로 앱을 다시 빌드해주세요.

@@ -2,13 +2,13 @@ import SignupHeader from "@/components/SignupHeader";
 import { fonts } from "@/constants/typography";
 import { useSignup } from "@/hooks/mutations/useAuthMutations";
 import { useCheckNickname } from "@/hooks/queries/useAuthQueries";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   BottomSheetBackdrop,
   BottomSheetFlatList,
   BottomSheetModal,
   BottomSheetTextInput,
 } from "@gorhom/bottom-sheet";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import {
@@ -128,7 +128,6 @@ export default function ProfilePage() {
       setErrors(e);
       return;
     }
-
     signupMutation.mutate(
       {
         schoolEmail: data.email,
@@ -293,7 +292,7 @@ export default function ProfilePage() {
           >
             {isValid ? (
               <LinearGradient
-                colors={["#4F6EF7", "#6C8BFF"]}
+                colors={["#6366f1", "#818cf8"]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={[styles.button, isLoading && styles.disabledButton]}
@@ -377,7 +376,7 @@ export default function ProfilePage() {
               >
                 {item}
               </Text>
-              {data.department === item && <Check size={18} color="#4F6EF7" />}
+              {data.department === item && <Check size={18} color="#6366f1" />}
             </TouchableOpacity>
           )}
           contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}
@@ -453,9 +452,9 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: "transparent",
   },
-  gradeButtonActive: { backgroundColor: "#EEF1FE", borderColor: "#4F6EF7" },
+  gradeButtonActive: { backgroundColor: "#eef2ff", borderColor: "#6366f1" },
   gradeText: { fontSize: 14, color: "#aaa", fontFamily: fonts.medium },
-  gradeTextActive: { color: "#4F6EF7", fontFamily: fonts.bold },
+  gradeTextActive: { color: "#6366f1", fontFamily: fonts.bold },
   buttonWrapper: { borderRadius: 14, overflow: "hidden" },
   button: { height: 54, alignItems: "center", justifyContent: "center" },
   buttonInactive: { backgroundColor: "#e5e5e5" },
@@ -518,7 +517,7 @@ const styles = StyleSheet.create({
   },
   deptItemSelected: { backgroundColor: "#f0f4ff" },
   deptItemText: { fontSize: 15, color: "#333", fontFamily: fonts.regular },
-  deptItemTextSelected: { color: "#4F6EF7", fontFamily: fonts.bold },
+  deptItemTextSelected: { color: "#6366f1", fontFamily: fonts.bold },
   emptyBox: { alignItems: "center", paddingVertical: 40 },
   emptyText: { fontSize: 14, color: "#aaa", fontFamily: fonts.regular },
 });
