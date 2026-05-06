@@ -50,3 +50,17 @@ export interface CheckNicknameResponse {
 export interface DeviceTokenRequest {
   token: string;
 }
+
+// User Profile Types
+export interface UserProfile {
+  nickname: string;
+  department: string;
+  postCount: number;
+  chatRoomCount: number;
+  unreadCount: number;
+}
+
+export interface UpdateProfileRequest {
+  nickname: string;
+  department: string;
+}

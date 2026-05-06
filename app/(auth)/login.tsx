@@ -57,6 +57,7 @@ export default function LoginPage() {
         onSuccess: async (result) => {
           if (result.success) {
             Keyboard.dismiss();
+            console.log("Login Success! Received Token:", result.data.accessToken);
             await AsyncStorage.setItem("token", result.data.accessToken);
             await getFCMToken(sendTokenToServer);
             requestAnimationFrame(() => {
