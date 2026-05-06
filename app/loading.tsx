@@ -1,5 +1,5 @@
 import { fonts } from "@/constants/typography";
-import { validateAccessToken } from "@/utils/api";
+import { authService } from "@/api/services/auth";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
@@ -13,14 +13,22 @@ export default function LoadingScreen() {
   useEffect(() => {
     const checkToken = async () => {
       try {
-        await validateAccessToken();
-        const token = await AsyncStorage.getItem("token");
-        if (token) {
+        const savedToken = await AsyncStorage.getItem("token");
+        if (!savedToken) {
+          router.replace("/(auth)/login");
+          return;
+        }
+
+        const result = await authService.validateToken();
+        if (result.success) {
+          await AsyncStorage.setItem("token", result.data); // 신규 토큰 저장
           router.replace("/(tabs)/map");
         } else {
+          await AsyncStorage.removeItem("token");
           router.replace("/(auth)/login");
         }
       } catch (e) {
+        await AsyncStorage.removeItem("token");
         router.replace("/(auth)/login");
       }
     };

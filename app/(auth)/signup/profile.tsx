@@ -1,6 +1,8 @@
 import SignupHeader from "@/components/SignupHeader";
 import { fonts } from "@/constants/typography";
-import { SIGNUP_URL } from "@/constants/url";
+import { useSignup } from "@/hooks/mutations/useAuthMutations";
+import { useCheckNickname } from "@/hooks/queries/useAuthQueries";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   BottomSheetBackdrop,
   BottomSheetFlatList,
@@ -18,7 +20,7 @@ import {
   User,
   X,
 } from "lucide-react-native";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Keyboard,
@@ -32,7 +34,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useSignup } from "./_layout";
+import { useSignup as useSignupData } from "./_layout";
 
 const DEPARTMENTS = [
   "화학전공",
@@ -65,12 +67,25 @@ const DEPARTMENTS = [
 const GRADES = ["1학년", "2학년", "3학년", "4학년"];
 
 export default function ProfilePage() {
-  const { data, updateData } = useSignup();
+  const { data, updateData } = useSignupData();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [isLoading, setIsLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [isNicknameAvailable, setIsNicknameAvailable] = useState<boolean | null>(null);
+
+  const signupMutation = useSignup();
+  const nicknameQuery = useCheckNickname(data.nickname);
+
+  const isLoading = signupMutation.isPending;
+
+  useEffect(() => {
+    if (data.nickname.length > 0 && nicknameQuery.data) {
+      setIsNicknameAvailable(nicknameQuery.data.success && nicknameQuery.data.data.available);
+    } else {
+      setIsNicknameAvailable(null);
+    }
+  }, [nicknameQuery.data, data.nickname]);
 
   const filteredDepartments = DEPARTMENTS.filter((dept) =>
     dept.includes(searchQuery),
@@ -101,49 +116,54 @@ export default function ProfilePage() {
   const validate = () => {
     const e: Record<string, string> = {};
     if (!data.nickname.trim()) e.nickname = "닉네임을 입력해주세요.";
+    if (isNicknameAvailable === false) e.nickname = "이미 사용 중인 닉네임입니다.";
     if (!data.department) e.department = "학과를 선택해주세요.";
     if (!data.grade) e.grade = "학년을 선택해주세요.";
     return e;
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = () => {
     const e = validate();
     if (Object.keys(e).length > 0) {
       setErrors(e);
       return;
     }
-    setIsLoading(true);
-    try {
-      const response = await fetch(SIGNUP_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          schoolEmail: data.email,
-          password: data.password,
-          nickname: data.nickname,
-          department: data.department,
-          grade: data.grade,
-        }),
-      });
-      const result = await response.json();
-      if (result.success) {
-        requestAnimationFrame(() => {
-          router.replace("/(tabs)/map");
-        });
-      } else {
-        setErrors({ nickname: result.error || "회원가입에 실패했습니다." });
+
+    signupMutation.mutate(
+      {
+        schoolEmail: data.email,
+        password: data.password,
+        nickname: data.nickname,
+        department: data.department,
+        grade: data.grade,
+      },
+      {
+        onSuccess: async (result) => {
+          if (result.success) {
+            if (result.data.access_token) {
+              await AsyncStorage.setItem("token", result.data.access_token);
+            }
+            requestAnimationFrame(() => {
+              router.replace("/(tabs)/map");
+            });
+          } else {
+            setErrors({ nickname: result.error || "회원가입에 실패했습니다." });
+          }
+        },
+        onError: () => {
+          setErrors({
+            nickname: "서버 연결에 실패했습니다. 잠시 후 다시 시도해주세요.",
+          });
+        },
       }
-    } catch (e) {
-      setErrors({
-        nickname: "서버 연결에 실패했습니다. 잠시 후 다시 시도해주세요.",
-      });
-    } finally {
-      setIsLoading(false);
-    }
+    );
   };
 
   const isValid =
-    data.nickname.trim().length > 0 && !!data.department && !!data.grade;
+    data.nickname.trim().length > 0 && 
+    isNicknameAvailable === true &&
+    !!data.department && 
+    !!data.grade;
 
   return (
     <View style={{ flex: 1, backgroundColor: "#fff" }}>

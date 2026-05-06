@@ -1,5 +1,5 @@
 import { fonts } from "@/constants/typography";
-import { LOGIN_URL } from "@/constants/url";
+import { useLogin } from "@/hooks/mutations/useAuthMutations";
 import { getFCMToken, sendTokenToServer } from "@/hooks/use-notifications";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { LinearGradient } from "expo-linear-gradient";
@@ -30,7 +30,9 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [emailError, setEmailError] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+
+  const loginMutation = useLogin();
+  const isLoading = loginMutation.isPending;
 
   const isValid = isSchoolEmail(email) && password.length > 0;
 
@@ -49,48 +51,30 @@ export default function LoginPage() {
       return;
     }
 
-    setIsLoading(true);
-    try {
-      const response = await fetch(LOGIN_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ schoolEmail: email, password }),
-      });
-
-      if (!response.ok) {
-        const errBody = await response.json().catch(() => null);
-        console.log("status:", response.status, "body:", errBody);
-        if (response.status === 401) {
-          setError("이메일 또는 비밀번호가 올바르지 않습니다.");
-        } else if (response.status >= 500) {
-          setError("서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
-        } else {
-          setError(errBody?.error || "로그인에 실패했습니다.");
-        }
-        return;
+    loginMutation.mutate(
+      { schoolEmail: email, password },
+      {
+        onSuccess: async (result) => {
+          if (result.success) {
+            Keyboard.dismiss();
+            await AsyncStorage.setItem("token", result.data.accessToken);
+            await getFCMToken(sendTokenToServer);
+            requestAnimationFrame(() => {
+              router.replace("/(tabs)/map");
+            });
+          } else {
+            setError(result.error || "이메일 또는 비밀번호가 올바르지 않습니다.");
+          }
+        },
+        onError: (e: any) => {
+          if (e.response?.status === 401) {
+            setError("이메일 또는 비밀번호가 올바르지 않습니다.");
+          } else {
+            setError("서버 연결에 실패했습니다. 잠시 후 다시 시도해주세요.");
+          }
+        },
       }
-
-      const result = await response.json();
-
-      if (result.success) {
-        Keyboard.dismiss();
-        await AsyncStorage.setItem("token", result.data.accessToken);
-        await getFCMToken(sendTokenToServer);
-        requestAnimationFrame(() => {
-          router.replace("/(tabs)/map");
-        });
-      } else {
-        setError(result.error || "이메일 또는 비밀번호가 올바르지 않습니다.");
-      }
-    } catch (e) {
-      if (e instanceof TypeError) {
-        setError("네트워크 연결을 확인해주세요.");
-      } else {
-        setError("서버 연결에 실패했습니다. 잠시 후 다시 시도해주세요.");
-      }
-    } finally {
-      setIsLoading(false);
-    }
+    );
   };
 
   return (
