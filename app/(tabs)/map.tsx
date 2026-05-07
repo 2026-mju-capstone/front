@@ -1,22 +1,23 @@
 import { BASE_BUILDINGS } from "@/constants/buildings";
-import { CATEGORY_MAP } from "@/constants/categories";
+import {
+  CATEGORY_ICON_MAP,
+  CATEGORY_MAP,
+  ITEM_STATUS_STYLE,
+  ITEM_TYPE_MAP,
+} from "@/constants/categories";
 import { fonts } from "@/constants/typography";
-import { ITEMS_LIST_URL } from "@/constants/url";
-import { sendAccessRequest } from "@/utils/api";
+import { ROUTES, BASE_URL } from "@/constants/url";
+import { useItemQueries } from "@/hooks/queries/useItemQueries";
 import BottomSheet, { BottomSheetScrollView } from "@gorhom/bottom-sheet";
 import * as Location from "expo-location";
 import { useRouter } from "expo-router";
 import {
   Bell,
-  Book,
   ChevronRight,
-  CreditCard,
   Crosshair,
-  Headphones,
   Package,
   Plus,
   Search,
-  Umbrella,
   User,
 } from "lucide-react-native";
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -27,33 +28,12 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  Image,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { WebView } from "react-native-webview";
 
 const KAKAO_API_KEY = "7488059674373cdf0eb9299fef1ec2ec";
-
-const TYPE_MAP: Record<string, string> = { LOST: "찾는중", FOUND: "발견됨" };
-
-const categoryIconMap: Record<string, any> = {
-  스마트폰: Headphones,
-  이어폰: Headphones,
-  가방: Package,
-  지갑: CreditCard,
-  카드: CreditCard,
-  학생증: CreditCard,
-  교재: Book,
-  노트: Book,
-  우산: Umbrella,
-  물병: Package,
-  필통: Package,
-  인형: Package,
-};
-
-const statusDotColor: Record<string, string> = {
-  LOST: "#f97316",
-  FOUND: "#22c55e",
-};
 
 type ApiItem = {
   id: number;
@@ -97,39 +77,15 @@ export default function MapScreen() {
   } | null>(null);
   const [searchFocused, setSearchFocused] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [buildings, setBuildings] = useState<Building[]>(
-    BASE_BUILDINGS.map((b) => ({ ...b, items: [] })),
-  );
   const router = useRouter();
 
-  const fetchAndMapItems = async () => {
-    try {
-      await sendAccessRequest(
-        ITEMS_LIST_URL,
-        JSON.stringify({}),
-        async (res) => {
-          const result = await res.json();
-          const apiItems: ApiItem[] =
-            result.success && result.data?.item_posts?.length > 0
-              ? result.data.item_posts
-              : [];
-          setBuildings(
-            BASE_BUILDINGS.map((b) => ({
-              ...b,
-              items: apiItems.filter((item) => item.building_id === b.id),
-            })),
-          );
-        },
-      );
-    } catch (e) {
-      console.error("분실물 목록 조회 실패", e);
-      setBuildings(BASE_BUILDINGS.map((b) => ({ ...b, items: [] })));
-    }
-  };
+  const { data: response } = useItemQueries.useItems(0, 1000); // 맵을 위해 대량 조회
+  const apiItems = response?.success ? response.data.item_posts : [];
 
-  useEffect(() => {
-    fetchAndMapItems();
-  }, []);
+  const buildings: Building[] = BASE_BUILDINGS.map((b) => ({
+    ...b,
+    items: apiItems.filter((item) => item.building_id === b.id),
+  }));
 
   useEffect(() => {
     let subscription: Location.LocationSubscription | null = null;
@@ -194,7 +150,7 @@ export default function MapScreen() {
   <html>
   <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <style>
       * { margin: 0; padding: 0; box-sizing: border-box; }
       html, body, #map { width: 100%; height: 100%; }
@@ -308,15 +264,12 @@ export default function MapScreen() {
       <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
         <Text style={styles.headerTitle}>캠퍼스 지도</Text>
         <View style={styles.headerIcons}>
-          <TouchableOpacity
-            style={styles.iconBtn}
-            onPress={() => router.push("/notifications")}
-          >
+          <TouchableOpacity style={styles.iconBtn}>
             <Bell size={20} color="#444" />
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.iconBtn}
-            onPress={() => router.push("/mypage")}
+            onPress={() => router.push(ROUTES.MYPAGE)}
           >
             <User size={20} color="#444" />
           </TouchableOpacity>
@@ -368,7 +321,7 @@ export default function MapScreen() {
 
         <TouchableOpacity
           style={styles.fab}
-          onPress={() => router.push("/lost-item-register")}
+          onPress={() => router.push(ROUTES.LOST_ITEM_REGISTER)}
         >
           <Plus size={22} color="#fff" />
         </TouchableOpacity>
@@ -414,22 +367,41 @@ export default function MapScreen() {
               ) : (
                 filteredItems.map((item) => {
                   const korCategory = CATEGORY_MAP[item.category] ?? "기타";
-                  const korStatus = TYPE_MAP[item.type] ?? item.type;
-                  const dotColor = statusDotColor[item.type] ?? "#aaa";
-                  const IconComponent = categoryIconMap[korCategory] ?? Package;
+                  const korStatus = ITEM_TYPE_MAP[item.type] ?? item.type;
+                  const statusStyle = ITEM_STATUS_STYLE[item.type] ?? {
+                    dot: "#aaa",
+                  };
+                  const IconComponent =
+                    CATEGORY_ICON_MAP[item.category] ?? Package;
                   const buildingName =
                     BASE_BUILDINGS.find((b) => b.id === item.building_id)
                       ?.name ?? "";
+
+                  // 이미지 URL 처리 (절대 경로가 아닐 경우 BASE_URL 결합)
+                  const imageUrl = item.image_url
+                    ? item.image_url.startsWith("http")
+                      ? item.image_url
+                      : `${BASE_URL}${item.image_url}`
+                    : null;
+
                   return (
                     <TouchableOpacity
                       key={item.id}
                       style={styles.itemCard}
                       onPress={() =>
-                        router.push(`/lost-item-detail?id=${item.id}`)
+                        router.push(`${ROUTES.LOST_ITEM_DETAIL}?id=${item.id}`)
                       }
                     >
                       <View style={styles.itemThumb}>
-                        <IconComponent size={22} color="#6366f1" />
+                        {imageUrl ? (
+                          <Image
+                            source={{ uri: imageUrl }}
+                            style={{ width: "100%", height: "100%" }}
+                            resizeMode="cover"
+                          />
+                        ) : (
+                          <IconComponent size={22} color="#6366f1" />
+                        )}
                       </View>
                       <View style={styles.itemInfo}>
                         <Text style={styles.itemCategory}>{korCategory}</Text>
@@ -446,7 +418,7 @@ export default function MapScreen() {
                           <View
                             style={[
                               styles.statusDot,
-                              { backgroundColor: dotColor },
+                              { backgroundColor: statusStyle.dot },
                             ]}
                           />
                           <Text style={styles.statusText}>{korStatus}</Text>
@@ -592,6 +564,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderWidth: 1.5,
     borderColor: "#6366f130",
+    overflow: "hidden",
   },
   itemInfo: { flex: 1 },
   itemCategory: {

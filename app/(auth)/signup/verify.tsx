@@ -1,9 +1,14 @@
 import SignupHeader from "@/components/SignupHeader";
 import { fonts } from "@/constants/typography";
+<<<<<<< HEAD
 import {
   useSendCertification,
   useVerifyCode,
 } from "@/hooks/mutations/useAuthMutations";
+=======
+import { ROUTES } from "@/constants/url";
+import { useSendCertification, useVerifyCode } from "@/hooks/mutations/useAuthMutations";
+>>>>>>> 67551bb (Feat: image upload in lost-item)
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { AlertCircle, ShieldCheck } from "lucide-react-native";
@@ -94,7 +99,7 @@ export default function VerifyStep() {
       {
         onSuccess: (result) => {
           if (result.success) {
-            router.push("/(auth)/signup/password");
+            router.push(ROUTES.SIGNUP_PASSWORD);
           } else {
             setCodeError(result.error || "인증 코드가 올바르지 않습니다.");
           }

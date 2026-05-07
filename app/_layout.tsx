@@ -1,3 +1,4 @@
+import { ROUTES } from "@/constants/url";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useNotifications } from "@/hooks/use-notifications";
 import { useAuthStore } from "@/store/authStore";
@@ -23,80 +24,72 @@ SplashScreen.preventAutoHideAsync();
 const queryClient = new QueryClient();
 
 export default function RootLayout() {
-  useNotifications();
-  const router = useRouter();
-  const segments = useSegments();
-  const { token, isInitialized, initialize } = useAuthStore();
+    useNotifications();
+    const router = useRouter();
+    const segments = useSegments();
+    const {token, isInitialized} = useAuthStore();
 
-  const colorScheme = useColorScheme();
-  const [fontsLoaded] = useFonts({
-    "Pretendard-Regular": require("../assets/fonts/Pretendard-Regular.otf"),
-    "Pretendard-Medium": require("../assets/fonts/Pretendard-Medium.otf"),
-    "Pretendard-Bold": require("../assets/fonts/Pretendard-Bold.otf"),
-  });
+    const colorScheme = useColorScheme();
+    const [fontsLoaded] = useFonts({
+        "Pretendard-Regular": require("../assets/fonts/Pretendard-Regular.otf"),
+        "Pretendard-Medium": require("../assets/fonts/Pretendard-Medium.otf"),
+        "Pretendard-Bold": require("../assets/fonts/Pretendard-Bold.otf"),
+    });
 
-  useEffect(() => {
-    initialize();
-  }, []);
+    // 인증 상태에 따른 리다이렉트 처리 (중앙 집중화)
+    useEffect(() => {
+        if (!isInitialized || !fontsLoaded) return;
 
-  useEffect(() => {
-    if (fontsLoaded && isInitialized) {
-      SplashScreen.hideAsync();
+        const inAuthGroup = segments[0] === "(auth)";
+
+        if (!token && !inAuthGroup) {
+            // 토큰이 없는데 인증이 필요한 페이지에 있다면 로그인으로 이동
+            router.replace(ROUTES.LOGIN);
+        } else if (token && inAuthGroup) {
+            // 토큰이 있는데 로그인/회원가입 페이지에 있다면 메인으로 이동
+            router.replace(ROUTES.MAP);
+        }
+    }, [token, isInitialized, segments, fontsLoaded]);
+
+    // 초기화 중이거나 폰트 로딩 중이면 스플래시 화면 유지
+    if (!isInitialized || !fontsLoaded) {
+        return null;
     }
-  }, [fontsLoaded, isInitialized]);
 
-  useEffect(() => {
-    if (!isInitialized) return;
-    const inAuthGroup = segments[0] === "(auth)";
-    if (!token && !inAuthGroup) {
-      router.replace("/(auth)/login");
-    } else if (token && inAuthGroup) {
-      router.replace("/(tabs)/map");
-    }
-  }, [token, isInitialized, segments]);
+    // 로딩 완료 시 스플래시 숨기기
+    SplashScreen.hideAsync();
 
-  if (!fontsLoaded || !isInitialized) return null;
-
-  return (
-    <QueryClientProvider client={queryClient}>
-      <GestureHandlerRootView style={{ flex: 1 }}>
-        <BottomSheetModalProvider>
-          <SafeAreaProvider>
-            <ThemeProvider
-              value={colorScheme === "dark" ? DarkTheme : DefaultTheme}
-            >
-              <Stack>
-                <Stack.Screen name="index" options={{ headerShown: false }} />
-                <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-                <Stack.Screen name="loading" options={{ headerShown: false }} />
-                <Stack.Screen
-                  name="modal"
-                  options={{ presentation: "modal", title: "Modal" }}
-                />
-                <Stack.Screen
-                  name="lost-item-detail"
-                  options={{ headerShown: false }}
-                />
-                <Stack.Screen
-                  name="lost-item-register"
-                  options={{ headerShown: false }}
-                />
-                <Stack.Screen
-                  name="chat-room"
-                  options={{ headerShown: false }}
-                />
-                <Stack.Screen
-                  name="notifications"
-                  options={{ headerShown: false }}
-                />
-                <Stack.Screen name="mypage" options={{ headerShown: false }} />
-              </Stack>
-              <StatusBar style="auto" />
-            </ThemeProvider>
-          </SafeAreaProvider>
-        </BottomSheetModalProvider>
-      </GestureHandlerRootView>
-    </QueryClientProvider>
-  );
+    return (
+        <QueryClientProvider client={queryClient}>
+            <GestureHandlerRootView style={{flex: 1}}>
+                <BottomSheetModalProvider>
+                    <SafeAreaProvider>
+                        <ThemeProvider
+                            value={colorScheme === "dark" ? DarkTheme : DefaultTheme}
+                        >
+                            <Stack>
+                                <Stack.Screen name="index" options={{headerShown: false}}/>
+                                <Stack.Screen name="(auth)" options={{headerShown: false}}/>
+                                <Stack.Screen name="(tabs)" options={{headerShown: false}}/>
+                                <Stack.Screen name="loading" options={{headerShown: false}}/>
+                                <Stack.Screen
+                                    name="modal"
+                                    options={{presentation: "modal", title: "Modal"}}
+                                />
+                                <Stack.Screen
+                                    name="lost-item-detail"
+                                    options={{headerShown: false}}
+                                />
+                                <Stack.Screen
+                                    name="lost-item-register"
+                                    options={{headerShown: false}}
+                                />
+                            </Stack>
+                            <StatusBar style="auto"/>
+                        </ThemeProvider>
+                    </SafeAreaProvider>
+                </BottomSheetModalProvider>
+            </GestureHandlerRootView>
+        </QueryClientProvider>
+    );
 }

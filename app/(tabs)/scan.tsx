@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import { fonts } from "@/constants/typography";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
@@ -250,6 +251,24 @@ export default function QRScanScreen() {
       </Modal>
     </View>
   );
+=======
+import {Camera} from "expo-camera";
+import {useEffect} from "react";
+import {Text, View} from "react-native";
+
+export default function Scan() {
+    useEffect(() => {
+        (async () => {
+            await Camera.requestCameraPermissionsAsync();
+        })();
+    }, []);
+
+    return (
+        <View style={{flex: 1, alignItems: "center", justifyContent: "center"}}>
+            <Text>스캔</Text>
+        </View>
+    );
+>>>>>>> 67551bb (Feat: image upload in lost-item)
 }
 
 const styles = StyleSheet.create({

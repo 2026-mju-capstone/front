@@ -1,4 +1,5 @@
 import { fonts } from "@/constants/typography";
+import { ROUTES } from "@/constants/url";
 import { useRouter } from "expo-router";
 import { Bell, MessageCircle, User } from "lucide-react-native";
 import { useEffect, useState } from "react";
@@ -12,7 +13,6 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-
 type ChatRoomRecord = {
   room_id: number;
   owner_nickname: string;
@@ -125,13 +125,13 @@ export default function ChatScreen() {
         <View style={styles.headerIcons}>
           <TouchableOpacity
             style={styles.iconBtn}
-            onPress={() => router.push("/notifications")}
+            onPress={() => router.push(ROUTES.NOTIFICATION)}
           >
             <Bell size={20} color="#444" />
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.iconBtn}
-            onPress={() => router.push("/mypage")}
+            onPress={() => router.push(ROUTES.MYPAGE)}
           >
             <User size={20} color="#444" />
           </TouchableOpacity>
@@ -172,7 +172,7 @@ export default function ChatScreen() {
               style={styles.chatCard}
               onPress={() =>
                 router.push({
-                  pathname: "/chat-room",
+                  pathname: ROUTES.CHAT,
                   params: { roomId: item.room_id },
                 })
               }
