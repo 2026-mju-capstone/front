@@ -1,6 +1,7 @@
 import SignupHeader from "@/components/SignupHeader";
 import { fonts } from "@/constants/typography";
-import { SIGNUP_URL } from "@/constants/url";
+import { useSignup } from "@/hooks/mutations/useAuthMutations";
+import { useCheckNickname } from "@/hooks/queries/useAuthQueries";
 import {
   BottomSheetBackdrop,
   BottomSheetFlatList,
@@ -19,7 +20,7 @@ import {
   User,
   X,
 } from "lucide-react-native";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Keyboard,
@@ -33,45 +34,31 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useSignup } from "./_layout";
-
-const DEPARTMENTS = [
-  "화학전공",
-  "에너지공학전공",
-  "식품영양학전공",
-  "생명과학정보학전공",
-  "기계공학전공",
-  "산업경영공학전공",
-  "토목환경공학전공",
-  "교통시스템공학전공",
-  "환경시스템공학전공",
-  "화학공학전공",
-  "신소재공학전공",
-  "반도체공학",
-  "전기공학전공",
-  "전자공학전공",
-  "컴퓨터공학전공",
-  "정보통신공학전공",
-  "체육학전공",
-  "스포츠산업학전공",
-  "뮤지컬공연전공",
-  "연극·영화전공",
-  "아트앤멀티미디어음악",
-  "건축학전공",
-  "전통건축전공",
-  "산업디자인전공",
-  "영상애니메이션디자인전공",
-].sort();
+import { useSignup as useSignupData } from "./_layout";
+import { DEPARTMENTS } from "@/constants/departments";
 
 const GRADES = ["1학년", "2학년", "3학년", "4학년"];
 
 export default function ProfilePage() {
-  const { data, updateData } = useSignup();
+  const { data, updateData } = useSignupData();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [isLoading, setIsLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [isNicknameAvailable, setIsNicknameAvailable] = useState<boolean | null>(null);
+
+  const signupMutation = useSignup();
+  const nicknameQuery = useCheckNickname(data.nickname);
+
+  const isLoading = signupMutation.isPending;
+
+  useEffect(() => {
+    if (data.nickname.length > 0 && nicknameQuery.data) {
+      setIsNicknameAvailable(nicknameQuery.data.success && nicknameQuery.data.data.available);
+    } else {
+      setIsNicknameAvailable(null);
+    }
+  }, [nicknameQuery.data, data.nickname]);
 
   const filteredDepartments = DEPARTMENTS.filter((dept) =>
     dept.includes(searchQuery),
@@ -102,54 +89,53 @@ export default function ProfilePage() {
   const validate = () => {
     const e: Record<string, string> = {};
     if (!data.nickname.trim()) e.nickname = "닉네임을 입력해주세요.";
+    if (isNicknameAvailable === false) e.nickname = "이미 사용 중인 닉네임입니다.";
     if (!data.department) e.department = "학과를 선택해주세요.";
     if (!data.grade) e.grade = "학년을 선택해주세요.";
     return e;
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = () => {
     const e = validate();
     if (Object.keys(e).length > 0) {
       setErrors(e);
       return;
     }
-    setIsLoading(true);
-    try {
-      const response = await fetch(SIGNUP_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          schoolEmail: data.email,
-          password: data.password,
-          nickname: data.nickname,
-          department: data.department,
-          grade: data.grade,
-        }),
-      });
-      const result = await response.json();
-      if (result.success) {
-        // 회원가입 성공 시 토큰 저장
-        const token = result.data?.access_token;
-        if (token) {
-          await AsyncStorage.setItem("token", token);
-        }
-        requestAnimationFrame(() => {
-          router.replace("/(tabs)/map");
-        });
-      } else {
-        setErrors({ nickname: result.error || "회원가입에 실패했습니다." });
+    signupMutation.mutate(
+      {
+        schoolEmail: data.email,
+        password: data.password,
+        nickname: data.nickname,
+        department: data.department,
+        grade: data.grade,
+      },
+      {
+        onSuccess: async (result) => {
+          if (result.success) {
+            if (result.data.access_token) {
+              await AsyncStorage.setItem("token", result.data.access_token);
+            }
+            requestAnimationFrame(() => {
+              router.replace("/(tabs)/map");
+            });
+          } else {
+            setErrors({ nickname: result.error || "회원가입에 실패했습니다." });
+          }
+        },
+        onError: () => {
+          setErrors({
+            nickname: "서버 연결에 실패했습니다. 잠시 후 다시 시도해주세요.",
+          });
+        },
       }
-    } catch (e) {
-      setErrors({
-        nickname: "서버 연결에 실패했습니다. 잠시 후 다시 시도해주세요.",
-      });
-    } finally {
-      setIsLoading(false);
-    }
+    );
   };
 
   const isValid =
-    data.nickname.trim().length > 0 && !!data.department && !!data.grade;
+    data.nickname.trim().length > 0 && 
+    isNicknameAvailable === true &&
+    !!data.department && 
+    !!data.grade;
 
   return (
     <View style={{ flex: 1, backgroundColor: "#fff" }}>

@@ -203,7 +203,10 @@ export default function LostItemBoard() {
             >
               <Bell size={20} color="#444" />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.iconBtn}>
+            <TouchableOpacity
+              style={styles.iconBtn}
+              onPress={() => router.push("/mypage")}
+            >
               <User size={20} color="#444" />
             </TouchableOpacity>
           </View>

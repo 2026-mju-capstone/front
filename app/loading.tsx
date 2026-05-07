@@ -1,3 +1,4 @@
+import { authService } from "@/api/services/auth";
 import { fonts } from "@/constants/typography";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { LinearGradient } from "expo-linear-gradient";
@@ -13,9 +14,24 @@ export default function LoadingScreen() {
     // ✅ 내부에서 async 함수 호출
     const checkToken = async () => {
       try {
-        await AsyncStorage.removeItem("token");
-        router.replace("/(auth)/login");
+        const savedToken = await AsyncStorage.getItem("token");
+        if (!savedToken) {
+          router.replace("/(auth)/login");
+          return;
+        }
+
+        const result = await authService.validateToken();
+        if (result.success) {
+          if (result.data) {
+            await AsyncStorage.setItem("token", result.data);
+          }
+          router.replace("/(tabs)/map");
+        } else {
+          await AsyncStorage.removeItem("token");
+          router.replace("/(auth)/login");
+        }
       } catch (e) {
+        await AsyncStorage.removeItem("token");
         router.replace("/(auth)/login");
       }
     };

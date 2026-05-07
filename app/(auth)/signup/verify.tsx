@@ -1,6 +1,6 @@
 import SignupHeader from "@/components/SignupHeader";
 import { fonts } from "@/constants/typography";
-import { CERTIFICATION_URL, VERIFY_URL } from "@/constants/url";
+import { useSendCertification, useVerifyCode } from "@/hooks/mutations/useAuthMutations";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { AlertCircle, ShieldCheck } from "lucide-react-native";
@@ -24,11 +24,15 @@ export default function VerifyStep() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [codeError, setCodeError] = useState("");
-  const [isSending, setIsSending] = useState(false);
-  const [isVerifying, setIsVerifying] = useState(false);
   const [timer, setTimer] = useState(180);
   const [codeSent, setCodeSent] = useState(true);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const sendCertificationMutation = useSendCertification();
+  const verifyCodeMutation = useVerifyCode();
+
+  const isSending = sendCertificationMutation.isPending;
+  const isVerifying = verifyCodeMutation.isPending;
 
   useEffect(() => {
     startTimer();
@@ -54,54 +58,49 @@ export default function VerifyStep() {
   const formatTimer = (s: number) =>
     `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
 
-  const handleResend = async () => {
-    setIsSending(true);
-    try {
-      const response = await fetch(CERTIFICATION_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: data.email }),
-      });
-      const result = await response.json();
-      if (result.success) {
-        startTimer();
-      } else {
-        setCodeError(result.error || "재발송에 실패했습니다.");
+  const handleResend = () => {
+    sendCertificationMutation.mutate(
+      { email: data.email },
+      {
+        onSuccess: (result) => {
+          if (result.success) {
+            startTimer();
+          } else {
+            setCodeError(result.error || "재발송에 실패했습니다.");
+          }
+        },
+        onError: () => {
+          setCodeError("서버 연결에 실패했습니다. 잠시 후 다시 시도해주세요.");
+        },
       }
-    } catch (e) {
-      setCodeError("서버 연결에 실패했습니다. 잠시 후 다시 시도해주세요.");
-    } finally {
-      setIsSending(false);
-    }
+    );
   };
 
-  const handleVerify = async () => {
+  const handleVerify = () => {
     setCodeError("");
     if (!data.verifyCode || data.verifyCode.length !== 6) {
       setCodeError("6자리 인증 코드를 입력해주세요.");
       return;
     }
-    setIsVerifying(true);
-    try {
-      const response = await fetch(VERIFY_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: data.email,
-          certificationNumber: data.verifyCode,
-        }),
-      });
-      const result = await response.json();
-      if (result.success) {
-        router.push("/(auth)/signup/password");
-      } else {
-        setCodeError(result.error || "인증 코드가 올바르지 않습니다.");
+    
+    verifyCodeMutation.mutate(
+      {
+        email: data.email,
+        certificationNumber: data.verifyCode,
+      },
+      {
+        onSuccess: (result) => {
+          if (result.success) {
+            router.push("/(auth)/signup/password");
+          } else {
+            setCodeError(result.error || "인증 코드가 올바르지 않습니다.");
+          }
+        },
+        onError: () => {
+          setCodeError("서버 연결에 실패했습니다. 잠시 후 다시 시도해주세요.");
+        },
       }
-    } catch (e) {
-      setCodeError("서버 연결에 실패했습니다. 잠시 후 다시 시도해주세요.");
-    } finally {
-      setIsVerifying(false);
-    }
+    );
   };
 
   const isCodeValid = data.verifyCode.length === 6;

@@ -31,7 +31,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { WebView } from "react-native-webview";
 
-const KAKAO_API_KEY = process.env.EXPO_PUBLIC_KAKAO_MAP_KEY!;
+const KAKAO_API_KEY = "7488059674373cdf0eb9299fef1ec2ec";
 
 const TYPE_MAP: Record<string, string> = { LOST: "찾는중", FOUND: "발견됨" };
 
@@ -314,7 +314,10 @@ export default function MapScreen() {
           >
             <Bell size={20} color="#444" />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.iconBtn}>
+          <TouchableOpacity
+            style={styles.iconBtn}
+            onPress={() => router.push("/mypage")}
+          >
             <User size={20} color="#444" />
           </TouchableOpacity>
         </View>

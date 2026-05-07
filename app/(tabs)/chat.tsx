@@ -1,8 +1,6 @@
 import { fonts } from "@/constants/typography";
-import { CHAT_ROOMS_URL, CHAT_ROOM_URL } from "@/constants/url";
-import { sendGetRequest } from "@/utils/api";
 import { useRouter } from "expo-router";
-import { Bell, MessageCircle, Package, User } from "lucide-react-native";
+import { Bell, MessageCircle, User } from "lucide-react-native";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -20,7 +18,20 @@ type ChatRoomRecord = {
   owner_nickname: string;
   finder_nickname: string;
   item_detail: string;
+  last_message?: string;
+  last_message_time?: string;
+  unread_count?: number;
 };
+
+function timeAgo(dateStr: string) {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const min = Math.floor(diff / 60000);
+  if (min < 1) return "방금 전";
+  if (min < 60) return `${min}분 전`;
+  const hour = Math.floor(min / 60);
+  if (hour < 24) return `${hour}시간 전`;
+  return "어제";
+}
 
 export default function ChatScreen() {
   const router = useRouter();
@@ -36,25 +47,63 @@ export default function ChatScreen() {
   const fetchChatRooms = async () => {
     setIsLoading(true);
     try {
-      await sendGetRequest(CHAT_ROOMS_URL, async (res) => {
-        const result = await res.json();
-        if (result.success && result.data?.chatRoomIds?.length > 0) {
-          const ids: number[] = result.data.chatRoomIds;
-          const rooms = await Promise.all(
-            ids.map(async (id) => {
-              return new Promise<ChatRoomRecord | null>(async (resolve) => {
-                await sendGetRequest(`${CHAT_ROOM_URL}/${id}`, async (res) => {
-                  const r = await res.json();
-                  resolve(r.success && r.data ? r.data : null);
-                });
-              });
-            }),
-          );
-          setChatRooms(rooms.filter(Boolean) as ChatRoomRecord[]);
-        } else {
-          setChatRooms([]);
-        }
-      });
+      // TODO: 실제 API 연결 후 더미데이터 제거
+      const dummyRooms: ChatRoomRecord[] = [
+        {
+          room_id: 1,
+          owner_nickname: "이서연",
+          finder_nickname: "이성민",
+          item_detail: "에어팟 프로",
+          last_message: "에어팟 찾으셨나요? 제가 도서관에서 봤어요!",
+          last_message_time: new Date(Date.now() - 1000 * 30).toISOString(),
+          unread_count: 3,
+        },
+        {
+          room_id: 2,
+          owner_nickname: "박지호",
+          finder_nickname: "이성민",
+          item_detail: "파란색 우산",
+          last_message: "우산 학생회관 안내데스크에 맡겨뒀어요",
+          last_message_time: new Date(
+            Date.now() - 1000 * 60 * 10,
+          ).toISOString(),
+          unread_count: 1,
+        },
+        {
+          room_id: 3,
+          owner_nickname: "김민준",
+          finder_nickname: "이성민",
+          item_detail: "검정 지갑",
+          last_message: "감사합니다! 내일 찾으러 갈게요",
+          last_message_time: new Date(
+            Date.now() - 1000 * 60 * 60,
+          ).toISOString(),
+          unread_count: 0,
+        },
+        {
+          room_id: 4,
+          owner_nickname: "최유나",
+          finder_nickname: "이성민",
+          item_detail: "갤럭시 버즈",
+          last_message: "갤럭시 버즈 맞나요? 확인해보세요",
+          last_message_time: new Date(
+            Date.now() - 1000 * 60 * 60 * 3,
+          ).toISOString(),
+          unread_count: 0,
+        },
+        {
+          room_id: 5,
+          owner_nickname: "정현우",
+          finder_nickname: "이성민",
+          item_detail: "학생증",
+          last_message: "학생증 체육관 분실물함에 있어요",
+          last_message_time: new Date(
+            Date.now() - 1000 * 60 * 60 * 25,
+          ).toISOString(),
+          unread_count: 0,
+        },
+      ];
+      setChatRooms(dummyRooms);
     } catch (e) {
       console.error("채팅방 목록 조회 실패", e);
       setChatRooms([]);
@@ -80,7 +129,10 @@ export default function ChatScreen() {
           >
             <Bell size={20} color="#444" />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.iconBtn}>
+          <TouchableOpacity
+            style={styles.iconBtn}
+            onPress={() => router.push("/mypage")}
+          >
             <User size={20} color="#444" />
           </TouchableOpacity>
         </View>
@@ -118,21 +170,47 @@ export default function ChatScreen() {
           renderItem={({ item }) => (
             <TouchableOpacity
               style={styles.chatCard}
-              onPress={() => router.push(`/chat-room?roomId=${item.room_id}`)}
+              onPress={() =>
+                router.push({
+                  pathname: "/chat-room",
+                  params: { roomId: item.room_id },
+                })
+              }
               activeOpacity={0.6}
             >
-              <View style={styles.chatThumb}>
-                <Package size={22} color="#6366f1" />
+              {/* 아바타 */}
+              <View style={styles.avatar}>
+                <User size={24} color="#aaa" />
               </View>
+
+              {/* 채팅 정보 */}
               <View style={styles.chatInfo}>
-                <Text style={styles.chatNickname}>
-                  {item.owner_nickname} · {item.finder_nickname}
-                </Text>
+                <View style={styles.chatTopRow}>
+                  <Text style={styles.chatNickname} numberOfLines={1}>
+                    {item.owner_nickname}
+                  </Text>
+                  <Text style={styles.chatTime}>
+                    {item.last_message_time
+                      ? timeAgo(item.last_message_time)
+                      : ""}
+                  </Text>
+                </View>
                 <Text style={styles.chatItemDetail} numberOfLines={1}>
                   {item.item_detail}
                 </Text>
+                <View style={styles.chatBottomRow}>
+                  <Text style={styles.chatLastMessage} numberOfLines={1}>
+                    {item.last_message ?? ""}
+                  </Text>
+                  {item.unread_count != null && item.unread_count > 0 && (
+                    <View style={styles.unreadBadge}>
+                      <Text style={styles.unreadBadgeText}>
+                        {item.unread_count}
+                      </Text>
+                    </View>
+                  )}
+                </View>
               </View>
-              <MessageCircle size={16} color="#ccc" />
             </TouchableOpacity>
           )}
         />
@@ -161,16 +239,17 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   loadingBox: { flex: 1, alignItems: "center", justifyContent: "center" },
-  listContent: { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 100 },
+  listContent: { paddingTop: 4, paddingBottom: 100 },
   chatCard: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
     gap: 14,
     borderBottomWidth: 1,
     borderBottomColor: "#f3f4f6",
   },
-  chatThumb: {
+  avatar: {
     width: 52,
     height: 52,
     borderRadius: 14,
@@ -180,9 +259,41 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: "#6366f130",
   },
-  chatInfo: { flex: 1, gap: 4 },
+  chatInfo: { flex: 1, gap: 3 },
+  chatTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
   chatNickname: { fontSize: 15, fontFamily: fonts.bold, color: "#111" },
-  chatItemDetail: { fontSize: 13, fontFamily: fonts.regular, color: "#aaa" },
+  chatTime: { fontSize: 12, fontFamily: fonts.regular, color: "#bbb" },
+  chatItemDetail: {
+    fontSize: 12,
+    fontFamily: fonts.regular,
+    color: "#6366f1",
+  },
+  chatBottomRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  chatLastMessage: {
+    fontSize: 13,
+    fontFamily: fonts.regular,
+    color: "#888",
+    flex: 1,
+  },
+  unreadBadge: {
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: "#6366f1",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 6,
+    marginLeft: 8,
+  },
+  unreadBadgeText: { fontSize: 11, fontFamily: fonts.bold, color: "#fff" },
   emptyBox: { alignItems: "center", paddingVertical: 80, gap: 12 },
   emptyIconWrap: {
     width: 72,

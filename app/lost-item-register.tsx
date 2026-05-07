@@ -1,7 +1,7 @@
 import { BASE_BUILDINGS } from "@/constants/buildings";
 import { CATEGORIES, COLORS } from "@/constants/categories";
 import { fonts } from "@/constants/typography";
-import { IMAGE_UPLOAD_URL, ITEMS_CREATE_URL } from "@/constants/url";
+import { BASE_URL, IMAGE_UPLOAD_URL, ITEMS_CREATE_URL } from "@/constants/url";
 import { sendAccessRequest } from "@/utils/api";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import DateTimePicker from "@react-native-community/datetimepicker";
@@ -75,8 +75,12 @@ async function uploadImage(uri: string): Promise<string | null> {
     if (!text) return null;
 
     const result = JSON.parse(text);
-    return result.success ? (result.data?.image_url ?? null) : null;
-  } catch {
+    return result.success
+      ? result.data?.image_url
+        ? `${BASE_URL}${result.data.image_url}`
+        : null
+      : null;
+  } catch (e) {
     return null;
   }
 }
