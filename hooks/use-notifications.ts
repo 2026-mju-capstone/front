@@ -1,5 +1,4 @@
-import { REGISTER_URL } from "@/constants/url";
-import { sendAccessRequest } from "@/utils/api";
+import { authService } from "@/api/services/auth";
 import messaging, { RemoteMessage } from "@react-native-firebase/messaging";
 import { useEffect } from "react";
 import { PermissionsAndroid, Platform } from "react-native";
@@ -23,14 +22,10 @@ export const getFCMToken = async (callback: TokenCallback) => {
 
 export const sendTokenToServer: TokenCallback = async (token: string) => {
   try {
-    sendAccessRequest(
-      REGISTER_URL,
-      JSON.stringify({ token: token }),
-      (response: Response) => {
-        if (!response.ok)
-          console.error(`Failed to register token: ${response.status}`);
-      },
-    );
+    const result = await authService.registerDeviceToken({ token });
+    if (!result.success) {
+      console.error(`Failed to register token: ${result.error}`);
+    }
   } catch (error) {
     console.error("Error sending token to server:", error);
   }

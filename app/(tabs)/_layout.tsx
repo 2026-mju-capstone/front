@@ -5,6 +5,7 @@ import {
   Map,
   MessageCircle,
   QrCode,
+  User,
 } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -67,6 +68,12 @@ export default function TabLayout() {
         options={{
           title: "채팅",
           tabBarIcon: ({ color }) => <MessageCircle size={20} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="mypage"
+        options={{
+          href: null,
         }}
       />
     </Tabs>

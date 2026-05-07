@@ -1,4 +1,5 @@
 import { fonts } from "@/constants/typography";
+import { authService } from "@/api/services/auth";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
@@ -12,13 +13,25 @@ export default function LoadingScreen() {
   useEffect(() => {
     const checkToken = async () => {
       try {
-        const token = await AsyncStorage.getItem("token");
-        if (token) {
+        const savedToken = await AsyncStorage.getItem("token");
+        if (!savedToken) {
+          router.replace("/(auth)/login");
+          return;
+        }
+
+        const result = await authService.validateToken();
+        if (result.success) {
+          // 서버에서 새 토큰을 내려준다면 저장 (선택 사항)
+          if (result.data) {
+            await AsyncStorage.setItem("token", result.data);
+          }
           router.replace("/(tabs)/map");
         } else {
+          await AsyncStorage.removeItem("token");
           router.replace("/(auth)/login");
         }
       } catch (e) {
+        await AsyncStorage.removeItem("token");
         router.replace("/(auth)/login");
       }
     };
@@ -28,15 +41,15 @@ export default function LoadingScreen() {
   return (
     <View style={styles.container}>
       <LinearGradient
-        colors={["#6366f1", "#818cf8"]}
+        colors={["#4F6EF7", "#6C8BFF"]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.logoBox}
       >
         <Search size={36} color="#fff" />
       </LinearGradient>
-      <Text style={styles.appName}>줍픽</Text>
-      <Text style={styles.subName}>줍고 픽하는 캠퍼스 생활</Text>
+      <Text style={styles.appName}>줍줍</Text>
+      <Text style={styles.subName}>Campus Lost & Found</Text>
     </View>
   );
 }
