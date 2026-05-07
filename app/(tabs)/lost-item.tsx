@@ -49,6 +49,7 @@ const CATEGORY_OPTIONS = [
   "물병",
   "필통",
   "인형",
+  "기타",
 ];
 const STATUS_OPTIONS = ["전체", "찾는중", "발견됨"];
 
@@ -130,9 +131,12 @@ export default function LostItemBoard() {
           const result = await res.json();
           if (result.success && result.data?.item_posts?.length > 0) {
             const newItems = result.data.item_posts;
-            setItems((prev) =>
-              pageNum === 0 ? newItems : [...prev, ...newItems],
+            const sorted = [...newItems].sort(
+              (a, b) =>
+                new Date(b.created_at).getTime() -
+                new Date(a.created_at).getTime(),
             );
+            setItems((prev) => (pageNum === 0 ? sorted : [...prev, ...sorted]));
             setHasMore(newItems.length === 20);
             setPage(pageNum);
           } else {
@@ -193,7 +197,10 @@ export default function LostItemBoard() {
         <View style={styles.header}>
           <Text style={styles.headerTitle}>분실물 게시판</Text>
           <View style={styles.headerIcons}>
-            <TouchableOpacity style={styles.iconBtn}>
+            <TouchableOpacity
+              style={styles.iconBtn}
+              onPress={() => router.push("/notifications")}
+            >
               <Bell size={20} color="#444" />
             </TouchableOpacity>
             <TouchableOpacity style={styles.iconBtn}>

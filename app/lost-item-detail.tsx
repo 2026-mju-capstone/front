@@ -1,8 +1,12 @@
 import { BASE_BUILDINGS } from "@/constants/buildings";
 import { CATEGORY_MAP } from "@/constants/categories";
 import { fonts } from "@/constants/typography";
-import { ITEMS_DETAIL_URL } from "@/constants/url";
-import { sendGetRequest } from "@/utils/api";
+import {
+  CHAT_ROOM_CREATE_URL,
+  CHAT_ROOM_FIND_URL,
+  ITEMS_DETAIL_URL,
+} from "@/constants/url";
+import { sendAccessRequest, sendGetRequest } from "@/utils/api";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
   Book,
@@ -33,7 +37,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { WebView } from "react-native-webview";
 
-const KAKAO_API_KEY = "7488059674373cdf0eb9299fef1ec2ec";
+const KAKAO_API_KEY = process.env.EXPO_PUBLIC_KAKAO_MAP_KEY!;
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 const categoryIconMap: Record<string, any> = {
@@ -69,6 +73,7 @@ type ItemDetail = {
   created_at: string;
   title?: string;
   description?: string;
+  author_id?: number; // 백엔드 추가 대기중
 };
 
 function formatDateTime(dateStr: string) {
@@ -86,6 +91,7 @@ export default function LostItemDetail() {
   const [item, setItem] = useState<ItemDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [showImageModal, setShowImageModal] = useState(false);
+  const [isChatLoading, setIsChatLoading] = useState(false);
 
   useEffect(() => {
     fetchDetail();
@@ -118,6 +124,51 @@ export default function LostItemDetail() {
       });
     } catch {
       Alert.alert("공유 실패");
+    }
+  };
+
+  const handleChatPress = async () => {
+    if (!item) return;
+    setIsChatLoading(true);
+    try {
+      // 1. 이미 채팅방 있는지 확인
+      await sendGetRequest(`${CHAT_ROOM_FIND_URL}/${item.id}`, async (res) => {
+        const result = await res.json();
+        if (result.success && result.data?.exists) {
+          // 채팅방 이미 있음 → 바로 진입
+          router.push(`/chat-room?roomId=${result.data.room_id}`);
+        } else {
+          // 채팅방 없음 → 생성 시도
+          if (!item.author_id) {
+            // author_id 백엔드 미구현
+            Alert.alert(
+              "잠시만요",
+              "채팅 기능을 준비중이에요.\n조금만 기다려주세요!",
+              [{ text: "확인" }],
+            );
+            return;
+          }
+          await sendAccessRequest(
+            CHAT_ROOM_CREATE_URL,
+            JSON.stringify({
+              item_id: item.id,
+              counterpart_id: item.author_id,
+            }),
+            async (res) => {
+              const result = await res.json();
+              if (result.success && result.data?.room_id) {
+                router.push(`/chat-room?roomId=${result.data.room_id}`);
+              } else {
+                Alert.alert("오류", "채팅방을 만들지 못했어요.");
+              }
+            },
+          );
+        }
+      });
+    } catch (e) {
+      Alert.alert("오류", "네트워크 오류가 발생했어요.");
+    } finally {
+      setIsChatLoading(false);
     }
   };
 
@@ -294,11 +345,18 @@ export default function LostItemDetail() {
       <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 8 }]}>
         <TouchableOpacity
           style={styles.chatBtn}
-          onPress={() => router.push("/(tabs)/chat")}
+          onPress={handleChatPress}
           activeOpacity={0.85}
+          disabled={isChatLoading}
         >
-          <MessageCircle size={18} color="#fff" />
-          <Text style={styles.chatBtnText}>채팅으로 문의하기</Text>
+          {isChatLoading ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <>
+              <MessageCircle size={18} color="#fff" />
+              <Text style={styles.chatBtnText}>채팅으로 문의하기</Text>
+            </>
+          )}
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.shareBtn}

@@ -11,9 +11,10 @@ export const CATEGORY_MAP: Record<string, string> = {
   WATER_BOTTLE: "물병",
   PENCIL_CASE: "필통",
   PLUSH_TOY: "인형",
+  OTHER: "기타",
 };
 
-export const CATEGORIES: { label: string; value: string }[] = [
+export const CATEGORIES = [
   { label: "스마트폰", value: "SMARTPHONE" },
   { label: "이어폰", value: "EARPHONES" },
   { label: "가방", value: "BAG" },
@@ -26,9 +27,10 @@ export const CATEGORIES: { label: string; value: string }[] = [
   { label: "물병", value: "WATER_BOTTLE" },
   { label: "필통", value: "PENCIL_CASE" },
   { label: "인형", value: "PLUSH_TOY" },
+  { label: "기타", value: "OTHER" },
 ];
 
-export const COLORS: { label: string; value: string }[] = [
+export const COLORS = [
   { label: "검정", value: "BLACK" },
   { label: "흰색", value: "WHITE" },
   { label: "회색", value: "GRAY" },
@@ -57,6 +59,7 @@ export const CATEGORY_TO_API: Record<string, string> = {
   물병: "WATER_BOTTLE",
   필통: "PENCIL_CASE",
   인형: "PLUSH_TOY",
+  기타: "OTHER",
 };
 
 export const CATEGORY_OPTIONS = [
@@ -73,4 +76,5 @@ export const CATEGORY_OPTIONS = [
   "물병",
   "필통",
   "인형",
+  "기타",
 ];

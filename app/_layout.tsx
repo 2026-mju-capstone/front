@@ -59,6 +59,11 @@ export default function RootLayout() {
                 name="lost-item-register"
                 options={{ headerShown: false }}
               />
+              <Stack.Screen name="chat-room" options={{ headerShown: false }} />
+              <Stack.Screen
+                name="notifications"
+                options={{ headerShown: false }}
+              />
             </Stack>
             <StatusBar style="auto" />
           </ThemeProvider>

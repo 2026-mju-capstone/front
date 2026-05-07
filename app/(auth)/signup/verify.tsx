@@ -230,7 +230,7 @@ const styles = StyleSheet.create({
   emailText: {
     fontSize: 15,
     fontWeight: "600",
-    color: "#4F6EF7",
+    color: "#6366f1",
     marginTop: 4,
     fontFamily: fonts.bold,
   },
@@ -279,7 +279,7 @@ const styles = StyleSheet.create({
   resendText: {
     fontSize: 13,
     fontWeight: "500",
-    color: "#4F6EF7",
+    color: "#6366f1",
     fontFamily: fonts.medium,
   },
   disabledText: { color: "#ccc" },

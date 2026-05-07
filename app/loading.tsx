@@ -10,14 +10,11 @@ export default function LoadingScreen() {
   const router = useRouter();
 
   useEffect(() => {
+    // ✅ 내부에서 async 함수 호출
     const checkToken = async () => {
       try {
-        const token = await AsyncStorage.getItem("token");
-        if (token) {
-          router.replace("/(tabs)/map");
-        } else {
-          router.replace("/(auth)/login");
-        }
+        await AsyncStorage.removeItem("token");
+        router.replace("/(auth)/login");
       } catch (e) {
         router.replace("/(auth)/login");
       }

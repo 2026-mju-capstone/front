@@ -1,16 +1,25 @@
 import { BASE_BUILDINGS } from "@/constants/buildings";
 import { CATEGORIES, COLORS } from "@/constants/categories";
 import { fonts } from "@/constants/typography";
-import { ITEMS_CREATE_URL } from "@/constants/url";
+import { IMAGE_UPLOAD_URL, ITEMS_CREATE_URL } from "@/constants/url";
 import { sendAccessRequest } from "@/utils/api";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import * as ImagePicker from "expo-image-picker";
 import * as Linking from "expo-linking";
 import * as MediaLibrary from "expo-media-library";
 import { useRouter } from "expo-router";
-import { Camera, ChevronRight, MapPin, X } from "lucide-react-native";
+import {
+  Camera,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  MapPin,
+  X,
+} from "lucide-react-native";
 import { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   Dimensions,
   FlatList,
@@ -34,17 +43,45 @@ const PHOTO_SIZE = (SCREEN_WIDTH - 4) / 3;
 function padTwo(n: number) {
   return String(n).padStart(2, "0");
 }
-
 function formatDate(d: Date) {
   return `${d.getFullYear()}. ${padTwo(d.getMonth() + 1)}. ${padTwo(d.getDate())}`;
 }
-
 function formatTime(d: Date) {
   const h = d.getHours();
   const ampm = h < 12 ? "오전" : "오후";
   const hh = h % 12 === 0 ? 12 : h % 12;
   return `${ampm} ${padTwo(hh)}:${padTwo(d.getMinutes())}`;
 }
+
+async function uploadImage(uri: string): Promise<string | null> {
+  try {
+    const token = await AsyncStorage.getItem("token");
+    if (!token) return null;
+
+    const filename = uri.split("/").pop() ?? "photo.jpg";
+    const ext = filename.split(".").pop()?.toLowerCase() ?? "jpg";
+    const mimeType = ext === "png" ? "image/png" : "image/jpeg";
+
+    const formData = new FormData();
+    formData.append("image", { uri, name: filename, type: mimeType } as any);
+
+    const response = await fetch(IMAGE_UPLOAD_URL, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: formData,
+    });
+
+    const text = await response.text();
+    if (!text) return null;
+
+    const result = JSON.parse(text);
+    return result.success ? (result.data?.image_url ?? null) : null;
+  } catch {
+    return null;
+  }
+}
+
+type BottomSheetItem = { label: string; value: string };
 
 export default function LostItemRegister() {
   const router = useRouter();
@@ -63,12 +100,15 @@ export default function LostItemRegister() {
   const [showDateModal, setShowDateModal] = useState(false);
   const [showTimeModal, setShowTimeModal] = useState(false);
   const [showBuildingModal, setShowBuildingModal] = useState(false);
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [showColorModal, setShowColorModal] = useState(false);
   const [showPhotoModal, setShowPhotoModal] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [galleryPhotos, setGalleryPhotos] = useState<MediaLibrary.Asset[]>([]);
   const [selectedUris, setSelectedUris] = useState<string[]>([]);
   const [hasNextPage, setHasNextPage] = useState(false);
   const [endCursor, setEndCursor] = useState<string | undefined>();
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -79,6 +119,9 @@ export default function LostItemRegister() {
 
   const locationLabel = type === "FOUND" ? "발견 위치" : "분실 위치";
   const timeLabel = type === "FOUND" ? "발견 시각" : "분실 시각";
+  const categoryLabel =
+    CATEGORIES.find((c) => c.value === category)?.label ?? "";
+  const colorLabel = COLORS.find((c) => c.value === color)?.label ?? "";
 
   const openPhotoModal = async () => {
     const { status, canAskAgain } =
@@ -172,6 +215,33 @@ export default function LostItemRegister() {
       return;
     }
     setErrors({});
+    setIsSubmitting(true);
+    try {
+      let imageUrl: string | undefined;
+      if (photos.length > 0) {
+        const uploaded = await uploadImage(photos[0]);
+        if (uploaded) {
+          imageUrl = uploaded;
+        } else {
+          Alert.alert("이미지 업로드 실패", "사진 없이 등록할까요?", [
+            {
+              text: "취소",
+              style: "cancel",
+              onPress: () => setIsSubmitting(false),
+            },
+            { text: "등록하기", onPress: () => submitPost(undefined) },
+          ]);
+          return;
+        }
+      }
+      await submitPost(imageUrl);
+    } catch {
+      Alert.alert("오류", "네트워크 오류가 발생했어요.");
+      setIsSubmitting(false);
+    }
+  };
+
+  const submitPost = async (imageUrl?: string) => {
     try {
       const body = {
         type,
@@ -182,16 +252,20 @@ export default function LostItemRegister() {
         building_id: buildingId,
         detail_address: detail.trim() || undefined,
         reported_at: reportedAt.toISOString(),
+        image_url: imageUrl,
       };
       await sendAccessRequest(
         ITEMS_CREATE_URL,
         JSON.stringify(body),
         async (res) => {
-          const result = await res.json();
+          const text = await res.text();
+          if (!text) {
+            Alert.alert("등록 실패", `서버 오류 (${res.status})`);
+            return;
+          }
+          const result = JSON.parse(text);
           if (result.success) {
             const itemId = result.data?.itemId;
-            // TODO: PostBoardingScreen 구현 후 아래로 교체
-            // router.replace(`/post-boarding?itemId=${itemId}`);
             if (itemId) router.replace(`/lost-item-detail?id=${itemId}`);
             else router.back();
           } else {
@@ -201,17 +275,66 @@ export default function LostItemRegister() {
       );
     } catch {
       Alert.alert("오류", "네트워크 오류가 발생했어요.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
+
+  const renderBottomSheet = (
+    visible: boolean,
+    onClose: () => void,
+    title: string,
+    items: BottomSheetItem[],
+    selectedValue: string,
+    onSelect: (value: string) => void,
+  ) => (
+    <Modal visible={visible} transparent animationType="slide">
+      <Pressable style={styles.modalOverlay} onPress={onClose} />
+      <View style={[styles.bottomSheet, { paddingBottom: insets.bottom + 16 }]}>
+        <View style={styles.sheetHandle} />
+        <Text style={styles.sheetTitle}>{title}</Text>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          style={{ maxHeight: 360 }}
+        >
+          {items.map((item) => (
+            <TouchableOpacity
+              key={item.value}
+              style={[
+                styles.sheetItem,
+                selectedValue === item.value && styles.sheetItemActive,
+              ]}
+              onPress={() => {
+                onSelect(item.value);
+                onClose();
+              }}
+            >
+              <Text
+                style={[
+                  styles.sheetItemText,
+                  selectedValue === item.value && styles.sheetItemTextActive,
+                ]}
+              >
+                {item.label}
+              </Text>
+              {selectedValue === item.value && (
+                <Text style={styles.sheetItemCheck}>✓</Text>
+              )}
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
+    </Modal>
+  );
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Text style={styles.backText}>‹</Text>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+          <ChevronLeft size={22} color="#333" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>분실물 등록</Text>
-        <View style={{ width: 28 }} />
+        <View style={{ width: 36 }} />
       </View>
 
       <KeyboardAvoidingView
@@ -226,7 +349,6 @@ export default function LostItemRegister() {
             { paddingBottom: insets.bottom + 100 },
           ]}
         >
-          {/* 탭 */}
           <View style={styles.tabRow}>
             {(["FOUND", "LOST"] as const).map((t) => (
               <TouchableOpacity
@@ -247,7 +369,6 @@ export default function LostItemRegister() {
             ))}
           </View>
 
-          {/* 사진 */}
           <View style={styles.section}>
             <View style={styles.photoRow}>
               {photos.map((uri, i) => (
@@ -257,6 +378,11 @@ export default function LostItemRegister() {
                     style={styles.photoImage}
                     resizeMode="cover"
                   />
+                  {i === 0 && (
+                    <View style={styles.photoMainBadge}>
+                      <Text style={styles.photoMainBadgeText}>대표</Text>
+                    </View>
+                  )}
                   <TouchableOpacity
                     style={styles.photoRemove}
                     onPress={() =>
@@ -277,74 +403,67 @@ export default function LostItemRegister() {
                 </TouchableOpacity>
               )}
             </View>
+            {photos.length > 1 && (
+              <Text style={styles.photoHint}>
+                첫 번째 사진이 대표 이미지로 등록돼요
+              </Text>
+            )}
           </View>
 
-          {/* 카테고리 */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>
-              카테고리 <Text style={styles.required}>*</Text>
-            </Text>
-            <View style={styles.pillWrap}>
-              {CATEGORIES.map((cat) => (
-                <TouchableOpacity
-                  key={cat.value}
+          <View style={styles.rowSection}>
+            <View style={styles.halfSection}>
+              <Text style={styles.sectionTitle}>
+                카테고리 <Text style={styles.required}>*</Text>
+              </Text>
+              <TouchableOpacity
+                style={[
+                  styles.dropdownBtn,
+                  errors.category ? styles.inputBoxError : null,
+                ]}
+                onPress={() => setShowCategoryModal(true)}
+              >
+                <Text
                   style={[
-                    styles.pill,
-                    category === cat.value && styles.pillActive,
+                    styles.dropdownText,
+                    category && styles.dropdownTextFilled,
                   ]}
-                  onPress={() => {
-                    setCategory(cat.value);
-                    setErrors((e) => ({ ...e, category: "" }));
-                  }}
                 >
-                  <Text
-                    style={[
-                      styles.pillText,
-                      category === cat.value && styles.pillTextActive,
-                    ]}
-                  >
-                    {cat.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+                  {categoryLabel || "선택"}
+                </Text>
+                <ChevronDown size={15} color="#bbb" />
+              </TouchableOpacity>
+              {errors.category ? (
+                <Text style={styles.errorText}>{errors.category}</Text>
+              ) : null}
             </View>
-            {errors.category ? (
-              <Text style={styles.errorText}>{errors.category}</Text>
-            ) : null}
+
+            <View style={styles.halfSection}>
+              <Text style={styles.sectionTitle}>
+                색상 <Text style={styles.required}>*</Text>
+              </Text>
+              <TouchableOpacity
+                style={[
+                  styles.dropdownBtn,
+                  errors.color ? styles.inputBoxError : null,
+                ]}
+                onPress={() => setShowColorModal(true)}
+              >
+                <Text
+                  style={[
+                    styles.dropdownText,
+                    color && styles.dropdownTextFilled,
+                  ]}
+                >
+                  {colorLabel || "선택"}
+                </Text>
+                <ChevronDown size={15} color="#bbb" />
+              </TouchableOpacity>
+              {errors.color ? (
+                <Text style={styles.errorText}>{errors.color}</Text>
+              ) : null}
+            </View>
           </View>
 
-          {/* 색상 */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>
-              색상 <Text style={styles.required}>*</Text>
-            </Text>
-            <View style={styles.pillWrap}>
-              {COLORS.map((c) => (
-                <TouchableOpacity
-                  key={c.value}
-                  style={[styles.pill, color === c.value && styles.pillActive]}
-                  onPress={() => {
-                    setColor(c.value);
-                    setErrors((e) => ({ ...e, color: "" }));
-                  }}
-                >
-                  <Text
-                    style={[
-                      styles.pillText,
-                      color === c.value && styles.pillTextActive,
-                    ]}
-                  >
-                    {c.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            {errors.color ? (
-              <Text style={styles.errorText}>{errors.color}</Text>
-            ) : null}
-          </View>
-
-          {/* 물품명 */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>
               물품명 <Text style={styles.required}>*</Text>
@@ -372,7 +491,6 @@ export default function LostItemRegister() {
             ) : null}
           </View>
 
-          {/* 상세 설명 */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>상세 설명</Text>
             <View style={styles.inputBox}>
@@ -396,7 +514,6 @@ export default function LostItemRegister() {
             <Text style={styles.charCount}>{description.length}/300</Text>
           </View>
 
-          {/* 위치 */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>
               {locationLabel} <Text style={styles.required}>*</Text>
@@ -435,7 +552,6 @@ export default function LostItemRegister() {
             </View>
           </View>
 
-          {/* 날짜/시간 */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>
               {timeLabel} <Text style={styles.required}>*</Text>
@@ -462,14 +578,23 @@ export default function LostItemRegister() {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* 등록 버튼 */}
       <View style={[styles.submitWrap, { paddingBottom: insets.bottom + 12 }]}>
-        <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit}>
-          <Text style={styles.submitText}>등록하기</Text>
+        <TouchableOpacity
+          style={[styles.submitBtn, isSubmitting && styles.submitBtnDisabled]}
+          onPress={handleSubmit}
+          disabled={isSubmitting}
+        >
+          {isSubmitting ? (
+            <View style={styles.submitLoadingRow}>
+              <ActivityIndicator size="small" color="#fff" />
+              <Text style={styles.submitText}>등록 중...</Text>
+            </View>
+          ) : (
+            <Text style={styles.submitText}>등록하기</Text>
+          )}
         </TouchableOpacity>
       </View>
 
-      {/* 사진 선택 모달 */}
       <Modal visible={showPhotoModal} animationType="slide">
         <View style={[styles.photoModalContainer, { paddingTop: insets.top }]}>
           <View style={styles.photoModalHeader}>
@@ -544,7 +669,30 @@ export default function LostItemRegister() {
         </View>
       </Modal>
 
-      {/* 건물 선택 모달 */}
+      {renderBottomSheet(
+        showCategoryModal,
+        () => setShowCategoryModal(false),
+        "카테고리 선택",
+        CATEGORIES,
+        category,
+        (val) => {
+          setCategory(val);
+          setErrors((e) => ({ ...e, category: "" }));
+        },
+      )}
+
+      {renderBottomSheet(
+        showColorModal,
+        () => setShowColorModal(false),
+        "색상 선택",
+        COLORS,
+        color,
+        (val) => {
+          setColor(val);
+          setErrors((e) => ({ ...e, color: "" }));
+        },
+      )}
+
       <Modal visible={showBuildingModal} transparent animationType="slide">
         <Pressable
           style={styles.modalOverlay}
@@ -555,30 +703,38 @@ export default function LostItemRegister() {
         >
           <View style={styles.sheetHandle} />
           <Text style={styles.sheetTitle}>건물 선택</Text>
-          {BASE_BUILDINGS.map((b) => (
-            <TouchableOpacity
-              key={b.id}
-              style={[
-                styles.sheetItem,
-                buildingId === b.id && styles.sheetItemActive,
-              ]}
-              onPress={() => {
-                setBuildingId(b.id);
-                setBuildingName(b.name);
-                setShowBuildingModal(false);
-                setErrors((e) => ({ ...e, building: "" }));
-              }}
-            >
-              <Text
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            style={{ maxHeight: 360 }}
+          >
+            {BASE_BUILDINGS.map((b) => (
+              <TouchableOpacity
+                key={b.id}
                 style={[
-                  styles.sheetItemText,
-                  buildingId === b.id && styles.sheetItemTextActive,
+                  styles.sheetItem,
+                  buildingId === b.id && styles.sheetItemActive,
                 ]}
+                onPress={() => {
+                  setBuildingId(b.id);
+                  setBuildingName(b.name);
+                  setShowBuildingModal(false);
+                  setErrors((e) => ({ ...e, building: "" }));
+                }}
               >
-                {b.name}
-              </Text>
-            </TouchableOpacity>
-          ))}
+                <Text
+                  style={[
+                    styles.sheetItemText,
+                    buildingId === b.id && styles.sheetItemTextActive,
+                  ]}
+                >
+                  {b.name}
+                </Text>
+                {buildingId === b.id && (
+                  <Text style={styles.sheetItemCheck}>✓</Text>
+                )}
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
         </View>
       </Modal>
 
@@ -615,12 +771,18 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingVertical: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     borderBottomWidth: 0.5,
     borderBottomColor: "#f0f0f0",
   },
-  backText: { fontSize: 28, color: "#333", lineHeight: 32 },
+  backBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   headerTitle: { fontSize: 16, fontFamily: fonts.bold, color: "#111" },
   scroll: { paddingHorizontal: 20 },
   tabRow: { flexDirection: "row", gap: 8, marginTop: 20, marginBottom: 24 },
@@ -639,14 +801,34 @@ const styles = StyleSheet.create({
   tabDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "#fff" },
   tabText: { fontSize: 14, fontFamily: fonts.bold, color: "#aaa" },
   tabTextActive: { color: "#fff" },
-  section: { marginBottom: 28 },
+  section: { marginBottom: 24 },
+  rowSection: { flexDirection: "row", gap: 12, marginBottom: 24 },
+  halfSection: { flex: 1 },
   sectionTitle: {
     fontSize: 15,
     fontFamily: fonts.bold,
     color: "#111",
-    marginBottom: 12,
+    marginBottom: 10,
   },
   required: { color: "#6366f1" },
+  dropdownBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    backgroundColor: "#fff",
+  },
+  dropdownText: {
+    fontSize: 14,
+    fontFamily: fonts.regular,
+    color: "#bbb",
+    flex: 1,
+  },
+  dropdownTextFilled: { color: "#111" },
   photoRow: { flexDirection: "row", gap: 10 },
   photoAdd: {
     width: 100,
@@ -667,6 +849,16 @@ const styles = StyleSheet.create({
     position: "relative",
   },
   photoImage: { width: "100%", height: "100%" },
+  photoMainBadge: {
+    position: "absolute",
+    bottom: 6,
+    left: 6,
+    backgroundColor: "#6366f1",
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  photoMainBadgeText: { fontSize: 10, fontFamily: fonts.bold, color: "#fff" },
   photoRemove: {
     position: "absolute",
     top: 4,
@@ -676,18 +868,12 @@ const styles = StyleSheet.create({
     padding: 3,
   },
   photoCount: { fontSize: 12, color: "#bbb", fontFamily: fonts.regular },
-  pillWrap: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  pill: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 24,
-    borderWidth: 1.5,
-    borderColor: "#e5e7eb",
-    backgroundColor: "#fff",
+  photoHint: {
+    fontSize: 11,
+    color: "#aaa",
+    fontFamily: fonts.regular,
+    marginTop: 8,
   },
-  pillActive: { backgroundColor: "#6366f1", borderColor: "#6366f1" },
-  pillText: { fontSize: 14, fontFamily: fonts.regular, color: "#555" },
-  pillTextActive: { color: "#fff", fontFamily: fonts.bold },
   inputBox: {
     borderWidth: 1,
     borderColor: "#e5e7eb",
@@ -747,6 +933,8 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 4,
   },
+  submitBtnDisabled: { opacity: 0.6, shadowOpacity: 0 },
+  submitLoadingRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   submitText: { fontSize: 16, fontFamily: fonts.bold, color: "#fff" },
   photoModalContainer: { flex: 1, backgroundColor: "#fff" },
   photoModalHeader: {
@@ -827,6 +1015,9 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   sheetItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingVertical: 14,
     borderBottomWidth: 1,
     borderBottomColor: "#f5f5f5",
@@ -838,4 +1029,5 @@ const styles = StyleSheet.create({
   },
   sheetItemText: { fontSize: 14, fontFamily: fonts.regular, color: "#444" },
   sheetItemTextActive: { color: "#6366f1", fontFamily: fonts.bold },
+  sheetItemCheck: { fontSize: 14, color: "#6366f1", fontFamily: fonts.bold },
 });

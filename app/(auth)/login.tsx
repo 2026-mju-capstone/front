@@ -111,7 +111,7 @@ export default function LoginPage() {
             >
               <Mail size={20} color="#fff" />
             </LinearGradient>
-            <Text style={styles.appName}>줍줍</Text>
+            <Text style={styles.appName}>줍픽</Text>
           </View>
 
           <View style={styles.inputWrapper}>

@@ -31,7 +31,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { WebView } from "react-native-webview";
 
-const KAKAO_API_KEY = "7488059674373cdf0eb9299fef1ec2ec";
+const KAKAO_API_KEY = process.env.EXPO_PUBLIC_KAKAO_MAP_KEY!;
 
 const TYPE_MAP: Record<string, string> = { LOST: "찾는중", FOUND: "발견됨" };
 
@@ -308,7 +308,10 @@ export default function MapScreen() {
       <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
         <Text style={styles.headerTitle}>캠퍼스 지도</Text>
         <View style={styles.headerIcons}>
-          <TouchableOpacity style={styles.iconBtn}>
+          <TouchableOpacity
+            style={styles.iconBtn}
+            onPress={() => router.push("/notifications")}
+          >
             <Bell size={20} color="#444" />
           </TouchableOpacity>
           <TouchableOpacity style={styles.iconBtn}>
