@@ -1,4 +1,5 @@
 import { fonts } from "@/constants/typography";
+import { ROUTES } from "@/constants/url";
 import { useRouter } from "expo-router";
 import { Bell, ChevronDown, User } from "lucide-react-native";
 import { useState } from "react";
@@ -185,13 +186,13 @@ export default function TimetableScreen() {
         <View style={styles.headerIcons}>
           <TouchableOpacity
             style={styles.iconBtn}
-            onPress={() => router.push("/notifications")}
+            onPress={() => router.push(ROUTES.NOTIFICATION)}
           >
             <Bell size={20} color="#444" />
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.iconBtn}
-            onPress={() => router.push("/mypage")}
+            onPress={() => router.push(ROUTES.MYPAGE)}
           >
             <User size={20} color="#444" />
           </TouchableOpacity>
