@@ -204,6 +204,7 @@ export default function TimetableScreen() {
 
   function handleDeleteSemester() {
     if (!semesterToDelete) return;
+    pendingActivateRef.current = null;
     deleteTimetable(semesterToDelete.timetableId, {
       onSuccess: () => {
         if (activeTimetableId === semesterToDelete.timetableId) {
@@ -211,7 +212,7 @@ export default function TimetableScreen() {
           setActiveTimetable(remaining[0]?.timetableId ?? null);
         }
         setSemesterToDelete(null);
-        setToastMsg(`${semesterLabel(semesterToDelete.year, semesterToDelete.semester)}이 삭제되었습니다`);
+        setToastMsg(`${semesterLabel(semesterToDelete.year, semesterToDelete.semester)}가 삭제되었습니다`);
       },
       onError: () => {
         setSemesterToDelete(null);

@@ -30,13 +30,6 @@ export const timetableService = {
         return response.data.data;
     },
 
-    getTimetables: async (year: number, semester: number) => {
-        const response = await axiosInstance.get<ApiResponse<TimetableSummary[]>>(TIMETABLES_URL, {
-            params: { year, semester }
-        });
-        return response.data.data;
-    },
-
     createTimetable: async (data: CreateTimetableRequest) => {
         const response = await axiosInstance.post<ApiResponse<TimetableSummary>>(TIMETABLES_URL, data);
         return response.data.data;
