@@ -1,12 +1,12 @@
 import { useMutation } from "@tanstack/react-query";
-import { authService } from "../../api/services/auth";
+import { authService } from "@/api/services/auth";
 import {
   LoginRequest,
   SignupRequest,
   CertificationRequest,
   VerifyRequest,
   DeviceTokenRequest,
-} from "../../api/types";
+} from "@/api/types";
 
 export const useLogin = () => {
     return useMutation({

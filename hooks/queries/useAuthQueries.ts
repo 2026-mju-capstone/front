@@ -1,5 +1,5 @@
 import {useQuery} from '@tanstack/react-query';
-import {authService} from '../../api/services/auth';
+import {authService} from '@/api/services/auth';
 
 export const useValidateToken = () => {
     return useQuery({

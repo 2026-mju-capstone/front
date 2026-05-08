@@ -20,6 +20,9 @@ export const ITEMS_DETAIL_URL = BASE_URL + "/api/items/post/list";
 export const PROFILE_ME_URL = BASE_URL + "/api/profiles/me";
 export const USER_ACCOUNT_URL = BASE_URL + "/api/user/account";
 
+// Chat
+export const CHAT_ROOM_URL = BASE_URL + "/api/chat/room";
+
 // Images
 export const IMAGE_UPLOAD_URL = BASE_URL + "/api/images/upload";
 
@@ -35,6 +38,7 @@ export const ROUTES = {
     LOST_ITEM_REGISTER: "/lost-item-register",
     LOST_ITEM_DETAIL: "/lost-item-detail",
     CHAT: "/(tabs)/chat",
+    CHAT_ROOM: "/chat-room",
     MAP: "/(tabs)/map",
     MYPAGE: "/(tabs)/mypage",
     SCAN: "/(tabs)/scan",

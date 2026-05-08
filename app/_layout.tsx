@@ -1,22 +1,22 @@
-import { ROUTES } from "@/constants/url";
-import { useColorScheme } from "@/hooks/use-color-scheme";
-import { useNotifications } from "@/hooks/use-notifications";
-import { useAuthStore } from "@/store/authStore";
-import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
+import {ROUTES} from "@/constants/url";
+import {useColorScheme} from "@/hooks/use-color-scheme";
+import {useNotifications} from "@/hooks/use-notifications";
+import {useAuthStore} from "@/store/authStore";
+import {BottomSheetModalProvider} from "@gorhom/bottom-sheet";
 import {
-  DarkTheme,
-  DefaultTheme,
-  ThemeProvider,
+    DarkTheme,
+    DefaultTheme,
+    ThemeProvider,
 } from "@react-navigation/native";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useFonts } from "expo-font";
-import { Stack, useRouter, useSegments } from "expo-router";
+import {QueryClient, QueryClientProvider} from "@tanstack/react-query";
+import {useFonts} from "expo-font";
+import {Stack, useRouter, useSegments} from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import { StatusBar } from "expo-status-bar";
-import { useEffect } from "react";
-import { GestureHandlerRootView } from "react-native-gesture-handler";
+import {StatusBar} from "expo-status-bar";
+import {useEffect} from "react";
+import {GestureHandlerRootView} from "react-native-gesture-handler";
 import "react-native-reanimated";
-import { SafeAreaProvider } from "react-native-safe-area-context";
+import {SafeAreaProvider} from "react-native-safe-area-context";
 import "../global.css";
 
 SplashScreen.preventAutoHideAsync();
@@ -82,6 +82,10 @@ export default function RootLayout() {
                                 />
                                 <Stack.Screen
                                     name="lost-item-register"
+                                    options={{headerShown: false}}
+                                />
+                                <Stack.Screen
+                                    name="chat-room"
                                     options={{headerShown: false}}
                                 />
                             </Stack>
