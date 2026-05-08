@@ -15,11 +15,11 @@ axiosInstance.interceptors.request.use(
         // 스토어에서 직접 토큰을 가져오거나 상태가 없으면 스토어의 현재 값을 참조
         const token = useAuthStore.getState().token;
 
+        if (__DEV__) {
+            console.log(`[API Request] ${config.method?.toUpperCase()} ${config.url}`);
+        }
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
-            if (__DEV__) {
-                console.log(`[API Request] ${config.method?.toUpperCase()} ${config.url}`);
-            }
         }
         return config;
     },
