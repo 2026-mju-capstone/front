@@ -1,11 +1,10 @@
 import { Tabs } from "expo-router";
 import {
-  CalendarDays,
-  ClipboardList,
-  Map,
-  MessageCircle,
-  QrCode,
-  User,
+    CalendarDays,
+    ClipboardList,
+    Map,
+    MessageCircle,
+    QrCode,
 } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -74,6 +73,7 @@ export default function TabLayout() {
         name="mypage"
         options={{
           href: null,
+          headerShown: false,
         }}
       />
     </Tabs>

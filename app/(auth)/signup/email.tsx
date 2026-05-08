@@ -1,6 +1,7 @@
 import SignupHeader from "@/components/SignupHeader";
 import { fonts } from "@/constants/typography";
 import { CERTIFICATION_URL } from "@/constants/url";
+import { ROUTES } from "@/constants/url";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { AlertCircle, Mail, X } from "lucide-react-native";
@@ -49,7 +50,7 @@ export default function EmailStep() {
       });
       const result = await response.json();
       if (result.success) {
-        router.push("/(auth)/signup/verify");
+        router.push(ROUTES.SIGNUP_VERIFY);
       } else {
         setEmailError(result.error || "인증 코드 발송에 실패했습니다.");
       }

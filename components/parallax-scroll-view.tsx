@@ -14,8 +14,8 @@ import { useThemeColor } from "@/hooks/use-theme-color";
 const HEADER_HEIGHT = 250;
 
 type Props = PropsWithChildren<{
-  headerImage: ReactElement;
-  headerBackgroundColor: { dark: string; light: string };
+    headerImage: ReactElement;
+    headerBackgroundColor: { dark: string; light: string };
 }>;
 
 export default function ParallaxScrollView({

@@ -1,63 +1,184 @@
+import axiosInstance from "@/api/client";
 import { fonts } from "@/constants/typography";
+import { ROUTES } from "@/constants/url";
+import { CameraView, useCameraPermissions } from "expo-camera";
+import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import {
-  Archive,
-  Bell,
-  Image as ImageIcon,
-  MessageCircle,
-  QrCode,
-  ScanLine,
-  User,
-  X,
+    Archive,
+    Bell,
+    Image as ImageIcon,
+    MessageCircle,
+    QrCode,
+    ScanLine,
+    User,
+    X,
 } from "lucide-react-native";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
-  Alert,
-  Modal,
-  Pressable,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    Alert,
+    Linking,
+    Modal,
+    Pressable,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 type ModalType = "owner" | "locker_success" | "locker_fail" | null;
 
-const DUMMY_OWNER = {
-  nickname: "김민준",
-  department: "컴퓨터공학과",
-  itemName: "학생증",
+type OwnerInfo = {
+  nickname: string;
+  department: string;
+  itemName: string;
+  itemId?: number;
 };
 
 export default function QRScanScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const [permission, requestPermission] = useCameraPermissions();
+  const [isScanning, setIsScanning] = useState(false);
   const [modalType, setModalType] = useState<ModalType>(null);
+  const [ownerInfo, setOwnerInfo] = useState<OwnerInfo | null>(null);
+  const [lockerId, setLockerId] = useState<number | null>(null);
+  const isProcessing = useRef(false);
 
-  const handleScanStart = () => {
-    Alert.alert("테스트", "어떤 모달 볼까요?", [
-      { text: "ownerQR", onPress: () => setModalType("owner") },
-      { text: "보관완료", onPress: () => setModalType("locker_success") },
-      { text: "권한없음", onPress: () => setModalType("locker_fail") },
-      { text: "취소", style: "cancel" },
-    ]);
+  const handleScanStart = async () => {
+    if (!permission?.granted) {
+      const { granted, canAskAgain } = await requestPermission();
+      if (!granted) {
+        if (!canAskAgain) {
+          Alert.alert(
+            "카메라 권한 필요",
+            "설정에서 카메라 권한을 허용해주세요.",
+            [
+              { text: "취소", style: "cancel" },
+              { text: "설정으로 이동", onPress: () => Linking.openSettings() },
+            ],
+          );
+        }
+        return;
+      }
+    }
+    setIsScanning(true);
   };
 
-  const handleGallery = () => {
+  const handleQRScanned = async ({ data }: { data: string }) => {
+    if (isProcessing.current) return;
+    isProcessing.current = true;
+    setIsScanning(false);
+
+    try {
+      const parsed = JSON.parse(data);
+
+      // 사물함 QR
+      // TODO: 백엔드 QR 데이터 형태 확인 후 조건 수정
+      if (parsed.type === "locker" && parsed.lockerId) {
+        setLockerId(parsed.lockerId);
+        try {
+          await axiosInstance.post(`/api/lockers/${parsed.lockerId}/unlock`, {
+            itemId: parsed.itemId ?? null,
+          });
+          setModalType("locker_success");
+        } catch (e: any) {
+          if (e.response?.status === 403) {
+            setModalType("locker_fail");
+          } else {
+            Alert.alert("오류", "사물함 열기에 실패했어요.");
+          }
+        }
+      }
+      // 물건 QR (ownerQR)
+      // TODO: 백엔드 QR 데이터 형태 확인 후 조건 수정
+      else if (parsed.type === "item") {
+        setOwnerInfo({
+          nickname: parsed.nickname ?? "알 수 없음",
+          department: parsed.department ?? "",
+          itemName: parsed.itemName ?? "물건",
+          itemId: parsed.itemId,
+        });
+        setModalType("owner");
+      } else {
+        Alert.alert("알 수 없는 QR", "인식할 수 없는 QR 코드예요.");
+      }
+    } catch {
+      Alert.alert("인식 실패", "QR 코드를 읽을 수 없어요.");
+    } finally {
+      isProcessing.current = false;
+    }
+  };
+
+  const handleGallery = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert("갤러리 권한 필요", "설정에서 갤러리 권한을 허용해주세요.");
+      return;
+    }
     Alert.alert("준비중", "갤러리 QR 인식은 준비중이에요.");
   };
 
   const handleChat = () => {
     setModalType(null);
-    router.push("/(tabs)/chat");
+    if (ownerInfo?.itemId) {
+      router.push({
+        pathname: ROUTES.CHAT_ROOM,
+        params: { itemId: ownerInfo.itemId },
+      } as any);
+    } else {
+      router.push(ROUTES.CHAT as any);
+    }
   };
 
-  const handleLockerClose = () => {
-    // TODO: 사물함 닫기 API 연결
+  const handleLockerClose = async () => {
+    if (lockerId) {
+      try {
+        await axiosInstance.post(`/api/lockers/${lockerId}/lock`);
+      } catch (e) {
+        console.error("사물함 닫기 실패", e);
+      }
+    }
     setModalType(null);
+    setLockerId(null);
   };
+
+  // 카메라 스캔 화면
+  if (isScanning) {
+    return (
+      <View style={styles.container}>
+        <CameraView
+          style={StyleSheet.absoluteFillObject}
+          facing="back"
+          barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
+          onBarcodeScanned={handleQRScanned}
+        />
+        {/* 스캔 오버레이 */}
+        <View style={[styles.scanOverlay, { paddingTop: insets.top + 10 }]}>
+          <TouchableOpacity
+            style={styles.cancelBtn}
+            onPress={() => setIsScanning(false)}
+          >
+            <X size={22} color="#fff" />
+          </TouchableOpacity>
+          <Text style={styles.scanGuideText}>
+            QR 코드를 프레임 안에 맞춰주세요
+          </Text>
+        </View>
+        {/* 스캔 프레임 */}
+        <View style={styles.scanFrameWrap}>
+          <View style={styles.scanFrame}>
+            <View style={[styles.corner, styles.cornerTL]} />
+            <View style={[styles.corner, styles.cornerTR]} />
+            <View style={[styles.corner, styles.cornerBL]} />
+            <View style={[styles.corner, styles.cornerBR]} />
+          </View>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -67,13 +188,13 @@ export default function QRScanScreen() {
         <View style={styles.headerIcons}>
           <TouchableOpacity
             style={styles.iconBtn}
-            onPress={() => router.push("/notifications")}
+            onPress={() => router.push(ROUTES.NOTIFICATION)}
           >
             <Bell size={20} color="#444" />
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.iconBtn}
-            onPress={() => router.push("/mypage")}
+            onPress={() => router.push("/(tabs)/mypage" as any)}
           >
             <User size={20} color="#444" />
           </TouchableOpacity>
@@ -82,12 +203,9 @@ export default function QRScanScreen() {
 
       {/* 바디 */}
       <View style={styles.body}>
-        {/* 안내 텍스트 */}
         <Text style={styles.guideText}>
           사물함 QR을 스캔하여 물건을 회수하세요
         </Text>
-
-        {/* QR 프레임 */}
         <View style={styles.frameWrap}>
           <View style={styles.frame}>
             <View style={[styles.corner, styles.cornerTL]} />
@@ -99,7 +217,6 @@ export default function QRScanScreen() {
             </View>
           </View>
         </View>
-
         <Text style={styles.frameGuide}>QR 코드를 프레임 안에 맞춰주세요</Text>
       </View>
 
@@ -142,12 +259,12 @@ export default function QRScanScreen() {
             <View style={styles.ownerAvatar}>
               <User size={32} color="#aaa" />
             </View>
-            <Text style={styles.ownerName}>{DUMMY_OWNER.nickname}</Text>
-            <Text style={styles.ownerDept}>{DUMMY_OWNER.department}</Text>
+            <Text style={styles.ownerName}>{ownerInfo?.nickname}</Text>
+            <Text style={styles.ownerDept}>{ownerInfo?.department}</Text>
             <Text style={styles.ownerDesc}>
-              {DUMMY_OWNER.nickname}님의 잃어버린 물건{" "}
+              {ownerInfo?.nickname}님의 잃어버린 물건{" "}
               <Text style={styles.ownerItem}>
-                &ldquo;{DUMMY_OWNER.itemName}&rdquo;
+                &ldquo;{ownerInfo?.itemName}&rdquo;
               </Text>{" "}
               을(를) 찾으셨나요?
             </Text>
@@ -365,6 +482,46 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   galleryBtnText: { fontSize: 15, fontFamily: fonts.regular, color: "#555" },
+  // 카메라 스캔 오버레이
+  scanOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 20,
+  },
+  cancelBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 16,
+  },
+  scanGuideText: {
+    fontSize: 15,
+    fontFamily: fonts.regular,
+    color: "#fff",
+    textAlign: "center",
+    textShadowColor: "rgba(0,0,0,0.5)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
+  },
+  scanFrameWrap: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  scanFrame: {
+    width: 240,
+    height: 240,
+    position: "relative",
+  },
   modalOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "rgba(0,0,0,0.5)",

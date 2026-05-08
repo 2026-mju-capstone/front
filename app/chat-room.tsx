@@ -1,28 +1,28 @@
+import axiosInstance from "@/api/client";
 import { fonts } from "@/constants/typography";
-import { CHAT_ROOM_URL } from "@/constants/url";
-import { sendAccessRequest } from "@/utils/api";
+import { ROUTES } from "@/constants/url";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
-  ChevronLeft,
-  ChevronRight,
-  MoreVertical,
-  Package,
-  Plus,
-  Send,
-  User,
+    ChevronLeft,
+    ChevronRight,
+    MoreVertical,
+    Package,
+    Plus,
+    Send,
+    User,
 } from "lucide-react-native";
 import { useEffect, useRef, useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  KeyboardAvoidingView,
-  Platform,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    FlatList,
+    KeyboardAvoidingView,
+    Platform,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -78,55 +78,27 @@ export default function ChatRoomScreen() {
   useEffect(() => {
     fetchChatRoom();
     fetchMessages();
-    // const interval = setInterval(fetchMessages, 5000);
-    // return () => clearInterval(interval);
+    const interval = setInterval(fetchMessages, 5000);
+    return () => clearInterval(interval);
   }, [roomId]);
 
   const fetchChatRoom = async () => {
-    // TODO: 실제 API 연결 후 더미데이터 제거
-    setChatRoom({
-      room_id: 1,
-      owner_nickname: "박지호",
-      finder_nickname: "이성민",
-      item_detail: "파란색 우산",
-      item_id: 1,
-    });
+    try {
+      const res = await axiosInstance.get(`/api/chat-rooms/${roomId}`);
+      if (res.data.success && res.data.data) {
+        setChatRoom(res.data.data);
+      }
+    } catch (e) {
+      console.error("채팅방 조회 실패", e);
+    }
   };
 
   const fetchMessages = async () => {
     try {
-      // TODO: 실제 API 연결 후 더미데이터 제거
-      const dummyMessages: Message[] = [
-        {
-          message: "파란색 우산 잃어버리셨나요?",
-          sender_id: 2,
-          sender_nickname: "박지호",
-          sent_at: new Date().toISOString().replace(/T.*/, "T13:00:00"),
-          read_at: new Date().toISOString(),
-        },
-        {
-          message: "네 맞아요! 어디서 보셨어요?",
-          sender_id: 1,
-          sender_nickname: "이성민",
-          sent_at: new Date().toISOString().replace(/T.*/, "T13:05:00"),
-          read_at: new Date().toISOString(),
-        },
-        {
-          message: "학생회관 1층 우산꽂이 옆에 있더라고요",
-          sender_id: 2,
-          sender_nickname: "박지호",
-          sent_at: new Date().toISOString().replace(/T.*/, "T13:06:00"),
-          read_at: new Date().toISOString(),
-        },
-        {
-          message: "우산 학생회관 안내데스크에 맡겨뒀어요",
-          sender_id: 2,
-          sender_nickname: "박지호",
-          sent_at: new Date().toISOString().replace(/T.*/, "T13:10:00"),
-          read_at: new Date().toISOString(),
-        },
-      ];
-      setMessages(dummyMessages);
+      const res = await axiosInstance.get(`/api/chat-rooms/${roomId}/messages`);
+      if (res.data.success && res.data.data?.messages) {
+        setMessages(res.data.data.messages);
+      }
     } catch (e) {
       console.error("메시지 조회 실패", e);
     } finally {
@@ -140,21 +112,20 @@ export default function ChatRoomScreen() {
     const text = inputText.trim();
     setInputText("");
     try {
-      await sendAccessRequest(
-        `${CHAT_ROOM_URL}/${roomId}/messages/send`,
-        JSON.stringify({ message: text }),
-        async (res) => {
-          const result = await res.json();
-          if (result.success) {
-            await fetchMessages();
-            flatListRef.current?.scrollToEnd({ animated: true });
-          } else {
-            Alert.alert("전송 실패", "메시지를 전송하지 못했어요.");
-            setInputText(text);
-          }
-        },
+      const response = await axiosInstance.post(
+        `/api/chat-rooms/${roomId}/messages/send`,
+        { message: text },
       );
-    } catch {
+
+      if (response.data.success) {
+        await fetchMessages();
+        flatListRef.current?.scrollToEnd({ animated: true });
+      } else {
+        Alert.alert("전송 실패", "메시지를 전송하지 못했어요.");
+        setInputText(text);
+      }
+    } catch (error) {
+      console.error("메시지 전송 에러:", error);
       Alert.alert("오류", "네트워크 오류가 발생했어요.");
       setInputText(text);
     } finally {
@@ -240,7 +211,10 @@ export default function ChatRoomScreen() {
           style={styles.itemBanner}
           onPress={() => {
             if (chatRoom.item_id) {
-              router.push(`/lost-item-detail?id=${chatRoom.item_id}`);
+              router.push({
+                pathname: ROUTES.LOST_ITEM_DETAIL,
+                params: { id: chatRoom.item_id },
+              });
             }
           }}
           activeOpacity={0.7}

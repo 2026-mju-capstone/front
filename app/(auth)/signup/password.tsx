@@ -1,5 +1,6 @@
 import SignupHeader from "@/components/SignupHeader";
 import { fonts } from "@/constants/typography";
+import { ROUTES } from "@/constants/url";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { AlertCircle, Check, Eye, EyeOff, Lock, X } from "lucide-react-native";
@@ -46,7 +47,7 @@ export default function PasswordStep() {
       setErrors(e);
       return;
     }
-    router.push("/(auth)/signup/profile");
+    router.push(ROUTES.SIGNUP_PROFILE);
   };
 
   return (

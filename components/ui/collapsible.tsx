@@ -29,11 +29,11 @@ export function Collapsible({
           style={{ transform: [{ rotate: isOpen ? "90deg" : "0deg" }] }}
         />
 
-        <ThemedText type="defaultSemiBold">{title}</ThemedText>
-      </TouchableOpacity>
-      {isOpen && <ThemedView style={styles.content}>{children}</ThemedView>}
-    </ThemedView>
-  );
+                <ThemedText type="defaultSemiBold">{title}</ThemedText>
+            </TouchableOpacity>
+            {isOpen && <ThemedView style={styles.content}>{children}</ThemedView>}
+        </ThemedView>
+    );
 }
 
 const styles = StyleSheet.create({

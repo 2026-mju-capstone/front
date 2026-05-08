@@ -1,39 +1,39 @@
 import { BASE_BUILDINGS } from "@/constants/buildings";
-import { CATEGORY_MAP, CATEGORY_TO_API } from "@/constants/categories";
+import {
+    CATEGORY_ICON_MAP,
+    CATEGORY_MAP,
+    CATEGORY_TO_API,
+    ITEM_STATUS_STYLE,
+    ITEM_TYPE_MAP,
+} from "@/constants/categories";
 import { fonts } from "@/constants/typography";
-import { ITEMS_LIST_URL } from "@/constants/url";
-import { sendAccessRequest } from "@/utils/api";
+import { BASE_URL, ROUTES } from "@/constants/url";
+import { useItemQueries } from "@/hooks/queries/useItemQueries";
 import { useRouter } from "expo-router";
 import {
-  Bell,
-  Book,
-  ChevronDown,
-  CreditCard,
-  Headphones,
-  MapPin,
-  Package,
-  Plus,
-  Search,
-  Umbrella,
-  User,
-  X,
+    Bell,
+    ChevronDown,
+    MapPin,
+    Package,
+    Plus,
+    Search,
+    User,
+    X,
 } from "lucide-react-native";
-import { useEffect, useState } from "react";
+import { useMemo, useState } from "react";
 import {
-  ActivityIndicator,
-  FlatList,
-  Image,
-  RefreshControl,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  TouchableWithoutFeedback,
-  View,
+    ActivityIndicator,
+    FlatList,
+    Image,
+    RefreshControl,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    TouchableWithoutFeedback,
+    View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-
-const TYPE_MAP: Record<string, string> = { LOST: "찾는중", FOUND: "발견됨" };
 
 const CATEGORY_OPTIONS = [
   "전체",
@@ -49,41 +49,8 @@ const CATEGORY_OPTIONS = [
   "물병",
   "필통",
   "인형",
-  "기타",
 ];
 const STATUS_OPTIONS = ["전체", "찾는중", "발견됨"];
-
-const categoryIconMap: Record<string, any> = {
-  스마트폰: Headphones,
-  이어폰: Headphones,
-  가방: Package,
-  지갑: CreditCard,
-  카드: CreditCard,
-  학생증: CreditCard,
-  교재: Book,
-  노트: Book,
-  우산: Umbrella,
-  물병: Package,
-  필통: Package,
-  인형: Package,
-};
-
-const statusDotColor: Record<string, string> = {
-  LOST: "#f97316",
-  FOUND: "#22c55e",
-};
-
-type Item = {
-  id: number;
-  type: string;
-  status: string;
-  category: string;
-  image_url?: string;
-  building_id: number;
-  data_address?: string;
-  created_at: string;
-  title?: string;
-};
 
 function timeAgo(dateStr: string) {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -102,77 +69,52 @@ export default function LostItemBoard() {
   const [searchQuery, setSearchQuery] = useState("");
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
-  const [items, setItems] = useState<Item[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [page, setPage] = useState(0);
-  const [hasMore, setHasMore] = useState(true);
-  const [isFetchingMore, setIsFetchingMore] = useState(false);
 
-  useEffect(() => {
-    setPage(0);
-    setHasMore(true);
-    fetchItems(0);
+  const filterBody = useMemo(() => {
+    const body: Record<string, string> = {};
+    if (typeFilter === "찾는중") body.status = "REPORTED";
+    if (CATEGORY_TO_API[category]) body.category = CATEGORY_TO_API[category];
+    return body;
   }, [typeFilter, category]);
 
-  const fetchItems = async (pageNum = 0) => {
-    if (pageNum === 0) setIsLoading(true);
-    else setIsFetchingMore(true);
-    try {
-      const filterBody: Record<string, string> = {};
-      if (typeFilter === "찾는중") filterBody.status = "REPORTED";
-      if (CATEGORY_TO_API[category])
-        filterBody.category = CATEGORY_TO_API[category];
+  const {
+    data,
+    isLoading,
+    isRefetching,
+    hasNextPage,
+    fetchNextPage,
+    isFetchingNextPage,
+    refetch,
+  } = useItemQueries.useInfiniteItems(20, filterBody);
 
-      await sendAccessRequest(
-        `${ITEMS_LIST_URL}?page=${pageNum}&size=20`,
-        JSON.stringify(filterBody),
-        async (res) => {
-          const result = await res.json();
-          if (result.success && result.data?.item_posts?.length > 0) {
-            const newItems = result.data.item_posts;
-            const sorted = [...newItems].sort(
-              (a, b) =>
-                new Date(b.created_at).getTime() -
-                new Date(a.created_at).getTime(),
-            );
-            setItems((prev) => (pageNum === 0 ? sorted : [...prev, ...sorted]));
-            setHasMore(newItems.length === 20);
-            setPage(pageNum);
-          } else {
-            if (pageNum === 0) setItems([]);
-            setHasMore(false);
-          }
-        },
-      );
-    } catch (e) {
-      console.error("분실물 목록 조회 실패", e);
-      if (pageNum === 0) setItems([]);
-    } finally {
-      setIsLoading(false);
-      setIsFetchingMore(false);
-      setIsRefreshing(false);
-    }
-  };
+  const items = useMemo(() => {
+    return (
+      data?.pages.flatMap((page) =>
+        page.success ? page.data.item_posts : [],
+      ) ?? []
+    );
+  }, [data]);
 
-  const filtered = items.filter((item) => {
-    const korCategory = CATEGORY_MAP[item.category] ?? "기타";
-    const buildingName =
-      BASE_BUILDINGS.find((b) => b.id === item.building_id)?.name ?? "";
-    const matchType =
-      typeFilter === "전체" ||
-      (typeFilter === "찾는중" && item.type === "LOST") ||
-      (typeFilter === "발견됨" && item.type === "FOUND");
-    const matchCategory =
-      category === "전체" || CATEGORY_TO_API[category] === item.category;
-    const matchSearch =
-      searchQuery === "" ||
-      item.title?.includes(searchQuery) ||
-      korCategory.includes(searchQuery) ||
-      buildingName.includes(searchQuery) ||
-      item.data_address?.includes(searchQuery);
-    return matchType && matchCategory && matchSearch;
-  });
+  const filtered = useMemo(() => {
+    return items.filter((item) => {
+      const korCategory = CATEGORY_MAP[item.category] ?? "기타";
+      const buildingName =
+        BASE_BUILDINGS.find((b) => b.id === item.building_id)?.name ?? "";
+      const matchType =
+        typeFilter === "전체" ||
+        (typeFilter === "찾는중" && item.type === "LOST") ||
+        (typeFilter === "발견됨" && item.type === "FOUND");
+      const matchCategory =
+        category === "전체" || CATEGORY_TO_API[category] === item.category;
+      const matchSearch =
+        searchQuery === "" ||
+        item.title?.includes(searchQuery) ||
+        korCategory.includes(searchQuery) ||
+        buildingName.includes(searchQuery) ||
+        item.data_address?.includes(searchQuery);
+      return matchType && matchCategory && matchSearch;
+    });
+  }, [items, typeFilter, category, searchQuery]);
 
   const closeDropdowns = () => {
     setShowStatusDropdown(false);
@@ -180,15 +122,13 @@ export default function LostItemBoard() {
   };
 
   const onRefresh = async () => {
-    setIsRefreshing(true);
-    setHasMore(true);
-    setPage(0);
-    await fetchItems(0);
+    await refetch();
   };
 
   const loadMore = () => {
-    if (!hasMore || isFetchingMore || isLoading) return;
-    fetchItems(page + 1);
+    if (hasNextPage && !isFetchingNextPage) {
+      fetchNextPage();
+    }
   };
 
   return (
@@ -197,15 +137,12 @@ export default function LostItemBoard() {
         <View style={styles.header}>
           <Text style={styles.headerTitle}>분실물 게시판</Text>
           <View style={styles.headerIcons}>
-            <TouchableOpacity
-              style={styles.iconBtn}
-              onPress={() => router.push("/notifications")}
-            >
+            <TouchableOpacity style={styles.iconBtn}>
               <Bell size={20} color="#444" />
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.iconBtn}
-              onPress={() => router.push("/mypage")}
+              onPress={() => router.push(ROUTES.MYPAGE)}
             >
               <User size={20} color="#444" />
             </TouchableOpacity>
@@ -364,7 +301,7 @@ export default function LostItemBoard() {
             onEndReachedThreshold={0.3}
             refreshControl={
               <RefreshControl
-                refreshing={isRefreshing}
+                refreshing={isRefetching}
                 onRefresh={onRefresh}
                 colors={["#6366f1"]}
                 tintColor="#6366f1"
@@ -376,7 +313,7 @@ export default function LostItemBoard() {
               </View>
             }
             ListFooterComponent={
-              isFetchingMore ? (
+              isFetchingNextPage ? (
                 <ActivityIndicator
                   color="#6366f1"
                   style={{ paddingVertical: 20 }}
@@ -385,27 +322,36 @@ export default function LostItemBoard() {
             }
             renderItem={({ item }) => {
               const korCategory = CATEGORY_MAP[item.category] ?? "기타";
-              const korStatus = TYPE_MAP[item.type] ?? item.type;
-              const dotColor = statusDotColor[item.type] ?? "#aaa";
-              const IconComponent = categoryIconMap[korCategory] ?? Package;
+              const korStatus = ITEM_TYPE_MAP[item.type] ?? item.type;
+              const statusStyle = ITEM_STATUS_STYLE[item.type] ?? {
+                dot: "#aaa",
+              };
+              const IconComponent = CATEGORY_ICON_MAP[item.category] ?? Package;
               const buildingName =
                 BASE_BUILDINGS.find((b) => b.id === item.building_id)?.name ??
                 "";
               const locationText = item.data_address
                 ? `${buildingName} · ${item.data_address}`
                 : buildingName;
+
+              const imageUrl = item.image_url
+                ? item.image_url.startsWith("http")
+                  ? item.image_url
+                  : `${BASE_URL}${item.image_url}`
+                : null;
+
               return (
                 <TouchableOpacity
                   style={styles.itemCard}
                   onPress={() => {
                     closeDropdowns();
-                    router.push(`/lost-item-detail?id=${item.id}`);
+                    router.push(`${ROUTES.LOST_ITEM_DETAIL}?id=${item.id}`);
                   }}
                   activeOpacity={0.6}
                 >
-                  {item.image_url ? (
+                  {imageUrl ? (
                     <Image
-                      source={{ uri: item.image_url }}
+                      source={{ uri: imageUrl }}
                       style={styles.itemThumbImage}
                       resizeMode="cover"
                     />
@@ -434,7 +380,7 @@ export default function LostItemBoard() {
                       <View
                         style={[
                           styles.statusDot,
-                          { backgroundColor: dotColor },
+                          { backgroundColor: statusStyle.dot },
                         ]}
                       />
                       <Text style={styles.statusText}>{korStatus}</Text>
@@ -448,7 +394,7 @@ export default function LostItemBoard() {
 
         <TouchableOpacity
           style={[styles.fab, { bottom: insets.bottom + 10 }]}
-          onPress={() => router.push("/lost-item-register")}
+          onPress={() => router.push(ROUTES.LOST_ITEM_REGISTER)}
         >
           <Plus size={18} color="#fff" />
           <Text style={styles.fabText}>분실물 등록</Text>

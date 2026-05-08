@@ -1,5 +1,6 @@
 import SignupHeader from "@/components/SignupHeader";
 import { fonts } from "@/constants/typography";
+import { ROUTES } from "@/constants/url";
 import { useSignup } from "@/hooks/mutations/useAuthMutations";
 import { useCheckNickname } from "@/hooks/queries/useAuthQueries";
 import {
@@ -121,7 +122,7 @@ export default function ProfilePage() {
               await AsyncStorage.setItem("token", result.data.access_token);
             }
             requestAnimationFrame(() => {
-              router.replace("/(tabs)/map");
+              router.replace(ROUTES.MAP);
             });
           } else {
             setErrors({ nickname: result.error || "회원가입에 실패했습니다." });
