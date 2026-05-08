@@ -1,7 +1,7 @@
 import { fonts } from "@/constants/typography";
 import { ROUTES } from "@/constants/url";
 import { useRouter } from "expo-router";
-import { Bell, ChevronDown, Plus, Save, User, X, Check } from "lucide-react-native";
+import { Bell, ChevronDown, Plus, Save, User, X, Check, WifiOff } from "lucide-react-native";
 import { useEffect, useState, useCallback, useMemo } from "react";
 
 import {
@@ -19,6 +19,7 @@ import {
   Platform,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useNetInfo } from "@react-native-community/netinfo";
 import { useTimetables, useTimetableDetail } from "@/hooks/queries/useTimetableQueries";
 import { useSyncTimetable, useCreateTimetable } from "@/hooks/mutations/useTimetableMutations";
 import { useTimetableStore } from "@/store/timetableStore";
@@ -56,6 +57,7 @@ function toMinutes(timeStr: string) {
 export default function TimetableScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { isConnected } = useNetInfo();
 
   // Zustand Store
   const { 
@@ -103,11 +105,11 @@ export default function TimetableScreen() {
       if (activeTimetableId !== null) {
         setActiveTimetable(null);
       }
-      if (showListModal && !showCreateModal) {
+      if (showListModal && !showCreateModal && isConnected !== false) {
         setShowCreateModal(true);
       }
     }
-  }, [timetables, isListLoading, showListModal, activeTimetableId, showCreateModal]);
+  }, [timetables, isListLoading, showListModal, activeTimetableId, showCreateModal, isConnected]);
 
   // 학기 이름 계산
   const activeTimetableName = useMemo(() => {
@@ -118,7 +120,7 @@ export default function TimetableScreen() {
 
   // 시간표 생성 핸들러
   const handleCreateTimetable = () => {
-    if (!newTimetableName.trim()) return;
+    if (!newTimetableName.trim() || isConnected === false) return;
     
     createMutation.mutate({
       name: newTimetableName.trim(),
@@ -146,6 +148,12 @@ export default function TimetableScreen() {
   const handleToggleEdit = () => {
     if (isEditing) {
       if (!activeTimetableId) return;
+      
+      if (isConnected === false) {
+        Alert.alert("알림", "오프라인 상태에서는 시간표를 저장할 수 없습니다.");
+        return;
+      }
+
       const syncData = {
         courses: draftCourses.map(c => ({
           courseId: c.courseId,
@@ -162,6 +170,10 @@ export default function TimetableScreen() {
         }
       });
     } else {
+      if (isConnected === false) {
+        Alert.alert("알림", "오프라인 상태에서는 시간표를 편집할 수 없습니다.");
+        return;
+      }
       startEditing(serverCourses || []);
     }
   };
@@ -220,6 +232,14 @@ export default function TimetableScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
+      {/* 오프라인 인디케이터 */}
+      {isConnected === false && (
+        <View style={styles.offlineBanner}>
+          <WifiOff size={14} color="#ef4444" />
+          <Text style={styles.offlineText}>오프라인 모드 (저장된 데이터를 표시함)</Text>
+        </View>
+      )}
+
       {/* 헤더 */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>시간표</Text>
@@ -250,8 +270,13 @@ export default function TimetableScreen() {
             </TouchableOpacity>
           )}
           <TouchableOpacity
-            style={[styles.toggleEditBtn, isEditing ? styles.saveBtn : styles.editBtn]}
+            style={[
+              styles.toggleEditBtn, 
+              isEditing ? styles.saveBtn : styles.editBtn,
+              isConnected === false && { opacity: 0.5 }
+            ]}
             onPress={handleToggleEdit}
+            disabled={isConnected === false && !isEditing}
           >
             {isEditing ? (
               <>
@@ -347,13 +372,15 @@ export default function TimetableScreen() {
           {renderPeriodSelector()}
           <View style={styles.listModalHeader}>
             <Text style={styles.sheetTitle}>시간표 목록</Text>
-            <TouchableOpacity 
-              onPress={() => setShowCreateModal(true)}
-              style={styles.addTimetableBtn}
-            >
-              <Plus size={14} color="#6366f1" />
-              <Text style={styles.addTimetableText}>추가</Text>
-            </TouchableOpacity>
+            {isConnected !== false && (
+              <TouchableOpacity 
+                onPress={() => setShowCreateModal(true)}
+                style={styles.addTimetableBtn}
+              >
+                <Plus size={14} color="#6366f1" />
+                <Text style={styles.addTimetableText}>추가</Text>
+              </TouchableOpacity>
+            )}
           </View>
 
           <ScrollView style={{maxHeight: 300}}>
@@ -444,6 +471,19 @@ export default function TimetableScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#fff" },
+  offlineBanner: {
+    backgroundColor: "#fef2f2",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 6,
+    gap: 6,
+  },
+  offlineText: {
+    color: "#ef4444",
+    fontSize: 12,
+    fontFamily: fonts.medium,
+  },
   loadingContainer: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#fff" },
   header: {
     flexDirection: "row",
