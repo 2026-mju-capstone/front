@@ -3,12 +3,20 @@ import {persist, createJSONStorage} from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {Course} from '@/api/types';
 
+export interface SemesterEntry {
+    year: number;
+    semester: number;
+    timetableId: number;
+    label: string;
+}
+
 interface TimetableState {
     currentYear: number;
     currentSemester: number;
     activeTimetableId: number | null;
     draftCourses: Course[];
     isEditing: boolean;
+    semesterList: SemesterEntry[];
 
     // Actions
     setPeriod: (year: number, semester: number) => void;
@@ -19,17 +27,21 @@ interface TimetableState {
     removeCourse: (courseId: number) => void;
     updateCourseColor: (courseId: number, color: string) => void;
     clearDraft: () => void;
+    addSemesterEntry: (entry: SemesterEntry) => void;
+    removeSemesterEntry: (timetableId: number) => void;
 }
+
+const toMinutes = (time: string) => {
+    const [h, m] = time.split(':').map(Number);
+    return h * 60 + m;
+};
 
 const isOverlap = (c1: Course, c2: Course) => {
     if (c1.dayOfWeek !== c2.dayOfWeek) return false;
-    
-    const start1 = c1.startTime;
-    const end1 = c1.endTime;
-    const start2 = c2.startTime;
-    const end2 = c2.endTime;
-
-    return (start1 < end2 && start2 < end1);
+    return (
+        Math.max(toMinutes(c1.startTime), toMinutes(c2.startTime)) <
+        Math.min(toMinutes(c1.endTime), toMinutes(c2.endTime))
+    );
 };
 
 export const useTimetableStore = create<TimetableState>()(
@@ -40,9 +52,10 @@ export const useTimetableStore = create<TimetableState>()(
             activeTimetableId: null,
             draftCourses: [],
             isEditing: false,
+            semesterList: [],
 
             setPeriod: (year, semester) => set({currentYear: year, currentSemester: semester}),
-            
+
             setActiveTimetable: (id) => set({activeTimetableId: id}),
 
             startEditing: (initialCourses) => set({
@@ -55,9 +68,7 @@ export const useTimetableStore = create<TimetableState>()(
             addCourse: (newCourse) => {
                 const {draftCourses} = get();
                 const hasOverlap = draftCourses.some(c => isOverlap(c, newCourse));
-                
                 if (hasOverlap) return false;
-
                 set({draftCourses: [...draftCourses, newCourse]});
                 return true;
             },
@@ -67,12 +78,20 @@ export const useTimetableStore = create<TimetableState>()(
             })),
 
             updateCourseColor: (courseId, color) => set((state) => ({
-                draftCourses: state.draftCourses.map(c => 
+                draftCourses: state.draftCourses.map(c =>
                     c.courseId === courseId ? {...c, color} : c
                 )
             })),
 
             clearDraft: () => set({draftCourses: []}),
+
+            addSemesterEntry: (entry) => set((state) => ({
+                semesterList: [entry, ...state.semesterList.filter(e => e.timetableId !== entry.timetableId)],
+            })),
+
+            removeSemesterEntry: (timetableId) => set((state) => ({
+                semesterList: state.semesterList.filter(e => e.timetableId !== timetableId),
+            })),
         }),
         {
             name: 'timetable-storage',
@@ -81,6 +100,7 @@ export const useTimetableStore = create<TimetableState>()(
                 currentYear: state.currentYear,
                 currentSemester: state.currentSemester,
                 activeTimetableId: state.activeTimetableId,
+                semesterList: state.semesterList,
             }),
         }
     )

@@ -45,5 +45,10 @@ export const timetableService = {
     syncTimetable: async (id: number, data: SyncTimetableRequest) => {
         const response = await axiosInstance.post<ApiResponse<string>>(`${TIMETABLES_URL}/${id}/sync`, data);
         return response.data.data;
-    }
+    },
+
+    deleteTimetable: async (id: number) => {
+        const response = await axiosInstance.delete<ApiResponse<string>>(`${TIMETABLES_URL}/${id}`);
+        return response.data.data;
+    },
 };

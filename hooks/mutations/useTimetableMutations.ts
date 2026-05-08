@@ -18,14 +18,25 @@ export const useCreateTimetable = () => {
 
 export const useSyncTimetable = () => {
     const queryClient = useQueryClient();
-    
+
     return useMutation({
-        mutationFn: ({id, data}: {id: number; data: SyncTimetableRequest}) => 
+        mutationFn: ({id, data}: {id: number; data: SyncTimetableRequest}) =>
             timetableService.syncTimetable(id, data),
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({
                 queryKey: timetableKeys.detail(variables.id)
             });
+        },
+    });
+};
+
+export const useDeleteTimetable = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (id: number) => timetableService.deleteTimetable(id),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: timetableKeys.all });
         },
     });
 };
