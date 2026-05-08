@@ -5,9 +5,9 @@ import { useNotifications } from "@/hooks/use-notifications";
 import { useAuthStore } from "@/store/authStore";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import {
-    DarkTheme,
-    DefaultTheme,
-    ThemeProvider,
+  DarkTheme,
+  DefaultTheme,
+  ThemeProvider,
 } from "@react-navigation/native";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useFonts } from "expo-font";
@@ -109,6 +109,9 @@ function RootLayoutNav() {
         />
         <Stack.Screen name="chat-room" options={{ headerShown: false }} />
         <Stack.Screen name="notifications" options={{ headerShown: false }} />
+        <Stack.Screen name="matches" options={{ headerShown: false }} />
+        <Stack.Screen name="my-qr" options={{ headerShown: false }} />
+        <Stack.Screen name="cctv-result" options={{ headerShown: false }} />
       </Stack>
       <StatusBar style="auto" />
     </ThemeProvider>

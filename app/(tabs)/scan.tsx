@@ -6,25 +6,25 @@ import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import {
-    Archive,
-    Bell,
-    Image as ImageIcon,
-    MessageCircle,
-    QrCode,
-    ScanLine,
-    User,
-    X,
+  Archive,
+  Bell,
+  Image as ImageIcon,
+  MessageCircle,
+  QrCode,
+  ScanLine,
+  User,
+  X,
 } from "lucide-react-native";
 import { useRef, useState } from "react";
 import {
-    Alert,
-    Linking,
-    Modal,
-    Pressable,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Alert,
+  Linking,
+  Modal,
+  Pressable,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -119,6 +119,31 @@ export default function QRScanScreen() {
       return;
     }
     Alert.alert("준비중", "갤러리 QR 인식은 준비중이에요.");
+  };
+
+  const handleTestModal = () => {
+    Alert.alert("테스트", "어떤 모달 볼까요?", [
+      {
+        text: "ownerQR",
+        onPress: () => {
+          setOwnerInfo({
+            nickname: "김민준",
+            department: "컴퓨터공학과",
+            itemName: "학생증",
+          });
+          setModalType("owner");
+        },
+      },
+      {
+        text: "보관완료",
+        onPress: () => {
+          setLockerId(1);
+          setModalType("locker_success");
+        },
+      },
+      { text: "권한없음", onPress: () => setModalType("locker_fail") },
+      { text: "취소", style: "cancel" },
+    ]);
   };
 
   const handleChat = () => {
@@ -246,6 +271,14 @@ export default function QRScanScreen() {
           <ImageIcon size={18} color="#555" />
           <Text style={styles.galleryBtnText}>갤러리에서 QR 불러오기</Text>
         </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.testBtn}
+          onPress={handleTestModal}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.testBtnText}>🧪 모달 테스트</Text>
+        </TouchableOpacity>
       </View>
 
       {/* ownerQR 모달 */}
@@ -325,12 +358,6 @@ export default function QRScanScreen() {
               >
                 <Text style={styles.lockerCloseBtnText}>사물함 닫기</Text>
               </LinearGradient>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.closeTextBtn}
-              onPress={() => setModalType(null)}
-            >
-              <Text style={styles.closeTextBtnText}>닫기</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -630,4 +657,12 @@ const styles = StyleSheet.create({
     backgroundColor: "#f5f6f8",
   },
   closeTextBtnText: { fontSize: 15, fontFamily: fonts.regular, color: "#555" },
+  testBtn: {
+    alignItems: "center",
+    justifyContent: "center",
+    height: 40,
+    borderRadius: 14,
+    backgroundColor: "#f3f4f6",
+  },
+  testBtnText: { fontSize: 13, fontFamily: fonts.regular, color: "#aaa" },
 });
