@@ -1,12 +1,12 @@
-import { useMutation } from '@tanstack/react-query';
-import { authService } from '../../api/services/auth';
-import { 
-  LoginRequest, 
-  SignupRequest, 
-  CertificationRequest, 
-  VerifyRequest, 
-  DeviceTokenRequest 
-} from '../../api/types';
+import { useMutation } from "@tanstack/react-query";
+import { authService } from "../../api/services/auth";
+import {
+  LoginRequest,
+  SignupRequest,
+  CertificationRequest,
+  VerifyRequest,
+  DeviceTokenRequest,
+} from "../../api/types";
 
 export const useLogin = () => {
   return useMutation({
@@ -28,7 +28,8 @@ export const useLogout = () => {
 
 export const useSendCertification = () => {
   return useMutation({
-    mutationFn: (data: CertificationRequest) => authService.sendCertification(data),
+    mutationFn: (data: CertificationRequest) =>
+      authService.sendCertification(data),
   });
 };
 
@@ -40,6 +41,7 @@ export const useVerifyCode = () => {
 
 export const useRegisterDeviceToken = () => {
   return useMutation({
-    mutationFn: (data: DeviceTokenRequest) => authService.registerDeviceToken(data),
+    mutationFn: (data: DeviceTokenRequest) =>
+      authService.registerDeviceToken(data),
   });
 };

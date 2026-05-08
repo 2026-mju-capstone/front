@@ -1,6 +1,9 @@
 import SignupHeader from "@/components/SignupHeader";
 import { fonts } from "@/constants/typography";
-import { useSendCertification, useVerifyCode } from "@/hooks/mutations/useAuthMutations";
+import {
+  useSendCertification,
+  useVerifyCode,
+} from "@/hooks/mutations/useAuthMutations";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { AlertCircle, ShieldCheck } from "lucide-react-native";
@@ -72,7 +75,7 @@ export default function VerifyStep() {
         onError: () => {
           setCodeError("서버 연결에 실패했습니다. 잠시 후 다시 시도해주세요.");
         },
-      }
+      },
     );
   };
 
@@ -82,7 +85,7 @@ export default function VerifyStep() {
       setCodeError("6자리 인증 코드를 입력해주세요.");
       return;
     }
-    
+
     verifyCodeMutation.mutate(
       {
         email: data.email,
@@ -99,7 +102,7 @@ export default function VerifyStep() {
         onError: () => {
           setCodeError("서버 연결에 실패했습니다. 잠시 후 다시 시도해주세요.");
         },
-      }
+      },
     );
   };
 

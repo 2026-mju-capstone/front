@@ -45,7 +45,9 @@ export default function ProfilePage() {
   const insets = useSafeAreaInsets();
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [searchQuery, setSearchQuery] = useState("");
-  const [isNicknameAvailable, setIsNicknameAvailable] = useState<boolean | null>(null);
+  const [isNicknameAvailable, setIsNicknameAvailable] = useState<
+    boolean | null
+  >(null);
 
   const signupMutation = useSignup();
   const nicknameQuery = useCheckNickname(data.nickname);
@@ -54,7 +56,9 @@ export default function ProfilePage() {
 
   useEffect(() => {
     if (data.nickname.length > 0 && nicknameQuery.data) {
-      setIsNicknameAvailable(nicknameQuery.data.success && nicknameQuery.data.data.available);
+      setIsNicknameAvailable(
+        nicknameQuery.data.success && nicknameQuery.data.data.available,
+      );
     } else {
       setIsNicknameAvailable(null);
     }
@@ -89,7 +93,8 @@ export default function ProfilePage() {
   const validate = () => {
     const e: Record<string, string> = {};
     if (!data.nickname.trim()) e.nickname = "닉네임을 입력해주세요.";
-    if (isNicknameAvailable === false) e.nickname = "이미 사용 중인 닉네임입니다.";
+    if (isNicknameAvailable === false)
+      e.nickname = "이미 사용 중인 닉네임입니다.";
     if (!data.department) e.department = "학과를 선택해주세요.";
     if (!data.grade) e.grade = "학년을 선택해주세요.";
     return e;
@@ -127,14 +132,14 @@ export default function ProfilePage() {
             nickname: "서버 연결에 실패했습니다. 잠시 후 다시 시도해주세요.",
           });
         },
-      }
+      },
     );
   };
 
   const isValid =
-    data.nickname.trim().length > 0 && 
+    data.nickname.trim().length > 0 &&
     isNicknameAvailable === true &&
-    !!data.department && 
+    !!data.department &&
     !!data.grade;
 
   return (

@@ -58,7 +58,10 @@ export default function LoginPage() {
         onSuccess: async (result) => {
           if (result.success) {
             Keyboard.dismiss();
-            console.log("Login Success! Received Token:", result.data.accessToken);
+            console.log(
+              "Login Success! Received Token:",
+              result.data.accessToken,
+            );
             // AsyncStorage 대신 zustand 스토어 사용
             await useAuthStore.getState().setToken(result.data.accessToken);
             await getFCMToken(sendTokenToServer);
@@ -66,7 +69,9 @@ export default function LoginPage() {
               router.replace("/(tabs)/map");
             });
           } else {
-            setError(result.error || "이메일 또는 비밀번호가 올바르지 않습니다.");
+            setError(
+              result.error || "이메일 또는 비밀번호가 올바르지 않습니다.",
+            );
           }
         },
         onError: (e: any) => {
@@ -76,7 +81,7 @@ export default function LoginPage() {
             setError("서버 연결에 실패했습니다. 잠시 후 다시 시도해주세요.");
           }
         },
-      }
+      },
     );
   };
 
