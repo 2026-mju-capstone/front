@@ -1,6 +1,6 @@
 import { fonts } from "@/constants/typography";
 import { useRouter } from "expo-router";
-import { Bell, ChevronDown, User } from "lucide-react-native";
+import { Bell, ChevronDown, Plus, User } from "lucide-react-native";
 import { useState } from "react";
 import {
   Modal,
@@ -183,6 +183,14 @@ export default function TimetableScreen() {
       <View style={styles.header}>
         <Text style={styles.headerTitle}>시간표</Text>
         <View style={styles.headerIcons}>
+          <TouchableOpacity
+            style={styles.iconBtn}
+            onPress={() => {
+              // TODO: 강의 추가 기능 연결
+            }}
+          >
+            <Plus size={20} color="#444" />
+          </TouchableOpacity>
           <TouchableOpacity
             style={styles.iconBtn}
             onPress={() => router.push("/notifications")}
