@@ -10,7 +10,10 @@ import {
     DefaultTheme,
     ThemeProvider,
 } from "@react-navigation/native";
-import {QueryClient, QueryClientProvider} from "@tanstack/react-query";
+import {QueryClient} from "@tanstack/react-query";
+import {PersistQueryClientProvider} from "@tanstack/react-query-persist-client";
+import {createAsyncStoragePersister} from "@tanstack/query-async-storage-persister";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import {useFonts} from "expo-font";
 import {Stack, useRouter, useSegments} from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
@@ -23,7 +26,18 @@ import "../global.css";
 
 SplashScreen.preventAutoHideAsync();
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+    defaultOptions: {
+        queries: {
+            gcTime: 1000 * 60 * 60 * 24, // 24시간 캐시 유지
+            staleTime: 1000 * 60 * 5, // 5분간 최신으로 간주
+        },
+    },
+});
+
+const asyncStoragePersister = createAsyncStoragePersister({
+    storage: AsyncStorage,
+});
 
 export default function RootLayout() {
     useNotifications();
@@ -62,7 +76,10 @@ export default function RootLayout() {
     SplashScreen.hideAsync();
 
     return (
-        <QueryClientProvider client={queryClient}>
+        <PersistQueryClientProvider
+            client={queryClient}
+            persistOptions={{persister: asyncStoragePersister}}
+        >
             <GestureHandlerRootView style={{flex: 1}}>
                 <BottomSheetModalProvider>
                     <SafeAreaProvider>
@@ -97,6 +114,6 @@ export default function RootLayout() {
                     </SafeAreaProvider>
                 </BottomSheetModalProvider>
             </GestureHandlerRootView>
-        </QueryClientProvider>
+        </PersistQueryClientProvider>
     );
 }
