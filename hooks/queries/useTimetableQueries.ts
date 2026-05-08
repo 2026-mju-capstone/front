@@ -4,7 +4,6 @@ import {timetableService} from '@/api/services/timetable';
 export const timetableKeys = {
     all: ['timetables'] as const,
     allList: () => [...timetableKeys.all, 'list'] as const,
-    list: (year: number, semester: number) => [...timetableKeys.all, 'list', year, semester] as const,
     detail: (id: number) => [...timetableKeys.all, 'detail', id] as const,
     courses: (year: number, semester: number, keyword: string) => ['courses', year, semester, keyword] as const,
 };
@@ -14,14 +13,6 @@ export const useAllTimetables = () => {
     return useQuery({
         queryKey: timetableKeys.allList(),
         queryFn: () => timetableService.getAllTimetables(),
-        staleTime: 0,
-    });
-};
-
-export const useTimetables = (year: number, semester: number) => {
-    return useQuery({
-        queryKey: timetableKeys.list(year, semester),
-        queryFn: () => timetableService.getTimetables(year, semester),
         staleTime: 0,
     });
 };

@@ -336,26 +336,6 @@ export default function TimetableScreen() {
                           <Text style={{ fontSize: 9, color: color.text, opacity: 0.6, marginTop: 2 }} numberOfLines={1}>
                             {cls.roomName}
                           </Text>
-                          {isDraft && (
-                            <View style={{ position: 'absolute', bottom: 4, right: 4, flexDirection: 'row', gap: 4 }}>
-                              <TouchableOpacity
-                                onPress={handleConfirmDraft}
-                                disabled={isSyncing}
-                                style={{ backgroundColor: '#4F6EF7', borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2 }}
-                              >
-                                {isSyncing
-                                  ? <ActivityIndicator size="small" color="#fff" />
-                                  : <Text style={{ fontSize: 8, fontWeight: 'bold', color: '#fff' }}>추가</Text>
-                                }
-                              </TouchableOpacity>
-                              <TouchableOpacity
-                                onPress={handleCancelDraft}
-                                style={{ backgroundColor: '#E5E7EB', borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2 }}
-                              >
-                                <Text style={{ fontSize: 8, fontWeight: 'bold', color: '#6B7280' }}>취소</Text>
-                              </TouchableOpacity>
-                            </View>
-                          )}
                         </TouchableOpacity>
                       );
                     })}
