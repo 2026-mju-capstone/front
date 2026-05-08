@@ -8,13 +8,19 @@ import {
   FlatList,
   Pressable,
   ActivityIndicator,
-  KeyboardAvoidingView,
+  Dimensions,
+  Keyboard,
+  Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Search, Book, Plus, AlertCircle } from 'lucide-react-native';
 import { Course } from '@/api/types';
 import { useSearchCourses } from '@/hooks/queries/useTimetableQueries';
 import { useDebounce } from '@/hooks/use-debounce';
+
+const SCREEN_HEIGHT = Dimensions.get('window').height;
+// 고정 요소(핸들바 + 제목 + 검색창 + 취소 버튼 + 패딩) 높이 근사값
+const MODAL_FIXED_HEIGHT = 290; // 현재 290이 나왔으면 모달창 : 기기 화면 높이 비율을 구하고 그걸 토대로 어느 기기던지 유동적으로 적용 가능하게 높이를 읽어서 불러오는 방식으로
 
 const DAY_LABELS: Record<string, string> = {
   MON: '월', TUE: '화', WED: '수', THU: '목', FRI: '금', SAT: '토', SUN: '일',
@@ -59,11 +65,33 @@ export default function CourseSearchModal({
 }: CourseSearchModalProps) {
   const insets = useSafeAreaInsets();
   const [keyword, setKeyword] = useState('');
-  const debouncedKeyword = useDebounce(keyword, 500);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const debouncedKeyword = useDebounce(keyword, 300);
 
   useEffect(() => {
-    if (!isVisible) setKeyword('');
+    if (!isVisible) {
+      setKeyword('');
+      setKeyboardHeight(0);
+    }
   }, [isVisible]);
+
+  // KeyboardAvoidingView 대신 직접 키보드 높이를 추적
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const showSub = Keyboard.addListener(showEvent, (e) => {
+      setKeyboardHeight(e.endCoordinates.height);
+    });
+    const hideSub = Keyboard.addListener(hideEvent, () => {
+      setKeyboardHeight(0);
+    });
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading } =
     useSearchCourses(year, semester, debouncedKeyword);
@@ -80,6 +108,11 @@ export default function CourseSearchModal({
       return 0;
     });
   }, [data, existingCourses]);
+
+  // 키보드가 올라오면 리스트 영역을 줄여서 모달이 화면을 벗어나지 않도록 함
+  const listMaxHeight = keyboardHeight > 0
+    ? Math.max(120, SCREEN_HEIGHT - keyboardHeight - MODAL_FIXED_HEIGHT)
+    : SCREEN_HEIGHT * 0.38;
 
   const renderItem = ({ item }: { item: Course }) => {
     const dup = isDuplicate(item, existingCourses);
@@ -136,22 +169,19 @@ export default function CourseSearchModal({
 
   return (
     <Modal visible={isVisible} transparent animationType="fade" onRequestClose={onClose}>
-      <KeyboardAvoidingView
-        behavior="padding"
-        style={{ flex: 1 }}
-      >
-        <Pressable
-          style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: 'rgba(0,0,0,0.2)' }}
-          onPress={onClose}
-        />
-        <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+      <Pressable
+        style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: 'rgba(0,0,0,0.2)' }}
+        onPress={onClose}
+      />
+      <View style={{ flex: 1, justifyContent: 'flex-end' }}>
         <View
           className="bg-white px-6 pt-6"
           style={{
             borderTopLeftRadius: 24,
             borderTopRightRadius: 24,
-            maxHeight: '85%',
-            paddingBottom: insets.bottom > 0 ? insets.bottom : 24,
+            // 키보드 높이만큼 위로 올림 → 키보드가 내려가면 자동으로 원위치
+            marginBottom: keyboardHeight,
+            paddingBottom: keyboardHeight > 0 ? 16 : (insets.bottom > 0 ? insets.bottom : 24),
           }}
         >
           <View className="w-10 h-1 bg-gray-200 rounded-full self-center mb-5" />
@@ -171,12 +201,13 @@ export default function CourseSearchModal({
             />
           </View>
 
+          {/* maxHeight로 결과 수에 따라 리스트 영역이 동적으로 늘어남 */}
           <FlatList
             data={allCourses}
             renderItem={renderItem}
             keyExtractor={(item) => item.courseId.toString()}
             showsVerticalScrollIndicator={false}
-            style={{ flex: 1 }}
+            style={{ maxHeight: listMaxHeight }}
             contentContainerStyle={{ flexGrow: 1, paddingBottom: 8 }}
             keyboardShouldPersistTaps="handled"
             onEndReached={() => { if (hasNextPage) fetchNextPage(); }}
@@ -187,13 +218,13 @@ export default function CourseSearchModal({
                 : null
             }
             ListEmptyComponent={
-              <View className="flex-1 items-center justify-center py-10">
+              <View style={{ height: 120, alignItems: 'center', justifyContent: 'center' }}>
                 {isLoading ? (
                   <ActivityIndicator color="#4F6EF7" />
-                ) : keyword.length < 2 ? (
+                ) : debouncedKeyword.length < 2 ? (
                   <>
                     <Search size={28} color="#D1D5DB" />
-                    <Text className="text-sm text-gray-400 mt-2">2글자 이상 검색어를 입력해주세요</Text>
+                    <Text className="text-sm text-gray-400 mt-2">강의명을 입력하면 자동으로 검색됩니다</Text>
                   </>
                 ) : (
                   <>
@@ -213,8 +244,7 @@ export default function CourseSearchModal({
             <Text className="text-sm font-bold text-gray-500">취소</Text>
           </TouchableOpacity>
         </View>
-        </View>
-      </KeyboardAvoidingView>
+      </View>
     </Modal>
   );
 }

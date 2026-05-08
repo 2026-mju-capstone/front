@@ -3,9 +3,9 @@ import { View, Text, TouchableOpacity, Pressable, ActivityIndicator } from 'reac
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Plus, ChevronDown, Book, Clock, MapPin, Trash2, AlertCircle, CalendarDays } from 'lucide-react-native';
 import { Course, DayOfWeek, TimetableSummary } from '@/api/types';
-import { useTimetableDetail } from '@/hooks/queries/useTimetableQueries';
+import { useAllTimetables, useTimetableDetail } from '@/hooks/queries/useTimetableQueries';
 import { useSyncTimetable, useDeleteTimetable } from '@/hooks/mutations/useTimetableMutations';
-import { useTimetableStore, SemesterEntry } from '@/store/timetableStore';
+import { useTimetableStore } from '@/store/timetableStore';
 import AddSemesterSheet from '@/components/AddSemesterSheet';
 import CourseSearchModal from '@/components/CourseSearchModal';
 
@@ -44,20 +44,23 @@ function timeToMinutes(time: string) {
   return h * 60 + m;
 }
 
+function semesterLabel(year: number, semester: number): string {
+  const term: Record<number, string> = { 1: '1학기', 2: '2학기', 3: '여름학기', 4: '겨울학기' };
+  return `${year}년 ${term[semester] ?? `${semester}학기`}`;
+}
+
 export default function TimetableScreen() {
   const insets = useSafeAreaInsets();
-  const {
-    semesterList,
-    activeTimetableId,
-    setPeriod,
-    setActiveTimetable,
-    addSemesterEntry,
-    removeSemesterEntry,
-  } = useTimetableStore();
+  const { activeTimetableId, setActiveTimetable } = useTimetableStore();
 
-  const activeSemester = semesterList.find(e => e.timetableId === activeTimetableId) ?? semesterList[0] ?? null;
+  // 시간표 목록 — 항상 서버에서 조회
+  const { data: timetables = [], isLoading: isLoadingList } = useAllTimetables();
 
-  const { data: savedCourses = [], isLoading: isLoadingCourses } = useTimetableDetail(
+  // 저장된 activeTimetableId가 서버 목록에 있으면 사용, 없으면 첫 번째 항목으로 fallback
+  const activeSemester: TimetableSummary | null =
+    timetables.find(t => t.timetableId === activeTimetableId) ?? timetables[0] ?? null;
+
+  const { data: savedCourses = [], isLoading: isLoadingCourses, refetch: refetchDetail } = useTimetableDetail(
     activeSemester?.timetableId ?? null
   );
   const { mutate: syncTimetable, isPending: isSyncing } = useSyncTimetable();
@@ -69,7 +72,7 @@ export default function TimetableScreen() {
   const [showAddSemester, setShowAddSemester] = useState(false);
   const [showSemesterPicker, setShowSemesterPicker] = useState(false);
   const [toastMsg, setToastMsg] = useState('');
-  const [semesterToDelete, setSemesterToDelete] = useState<SemesterEntry | null>(null);
+  const [semesterToDelete, setSemesterToDelete] = useState<TimetableSummary | null>(null);
 
   useEffect(() => {
     if (!toastMsg) return;
@@ -77,11 +80,19 @@ export default function TimetableScreen() {
     return () => clearTimeout(timer);
   }, [toastMsg]);
 
-  // activeSemester가 바뀌면 draft/selected 초기화
   useEffect(() => {
     setDraftCourse(null);
     setSelectedClass(null);
   }, [activeSemester?.timetableId]);
+
+  // activeTimetableId가 서버 목록에 없으면 자동 보정
+  useEffect(() => {
+    if (isLoadingList || timetables.length === 0) return;
+    const exists = timetables.some(t => t.timetableId === activeTimetableId);
+    if (!exists) {
+      setActiveTimetable(timetables[0]?.timetableId ?? null);
+    }
+  }, [timetables, activeTimetableId, isLoadingList]);
 
   const displayData = useMemo(() => {
     if (!draftCourse) return savedCourses;
@@ -115,16 +126,13 @@ export default function TimetableScreen() {
     }));
   }
 
-  function selectSemester(entry: SemesterEntry) {
-    setPeriod(entry.year, entry.semester);
-    setActiveTimetable(entry.timetableId);
+  function selectSemester(t: TimetableSummary) {
+    setActiveTimetable(t.timetableId);
     setShowSemesterPicker(false);
   }
 
-  function handleSemesterCreated(timetable: TimetableSummary, year: number, semester: number, label: string) {
-    const entry: SemesterEntry = { year, semester, timetableId: timetable.timetableId, label };
-    addSemesterEntry(entry);
-    setPeriod(year, semester);
+  function handleSemesterCreated(timetable: TimetableSummary) {
+    // 목록은 mutation의 invalidateQueries로 자동 갱신
     setActiveTimetable(timetable.timetableId);
   }
 
@@ -138,7 +146,10 @@ export default function TimetableScreen() {
     syncTimetable(
       { id: activeSemester.timetableId, data: { courses: buildSyncCourses([...savedCourses, draftCourse]) } },
       {
-        onSuccess: () => setDraftCourse(null),
+        onSuccess: () => {
+          setDraftCourse(null);
+          refetchDetail();
+        },
         onError: () => setToastMsg('강의 추가에 실패했습니다'),
       }
     );
@@ -154,7 +165,10 @@ export default function TimetableScreen() {
     syncTimetable(
       { id: activeSemester.timetableId, data: { courses: buildSyncCourses(remaining) } },
       {
-        onSuccess: () => setSelectedClass(null),
+        onSuccess: () => {
+          setSelectedClass(null);
+          refetchDetail();
+        },
         onError: () => setToastMsg('강의 삭제에 실패했습니다'),
       }
     );
@@ -164,18 +178,12 @@ export default function TimetableScreen() {
     if (!semesterToDelete) return;
     deleteTimetable(semesterToDelete.timetableId, {
       onSuccess: () => {
-        removeSemesterEntry(semesterToDelete.timetableId);
         if (activeTimetableId === semesterToDelete.timetableId) {
-          const remaining = semesterList.filter(e => e.timetableId !== semesterToDelete.timetableId);
-          if (remaining.length > 0) {
-            setPeriod(remaining[0].year, remaining[0].semester);
-            setActiveTimetable(remaining[0].timetableId);
-          } else {
-            setActiveTimetable(null);
-          }
+          const remaining = timetables.filter(t => t.timetableId !== semesterToDelete.timetableId);
+          setActiveTimetable(remaining[0]?.timetableId ?? null);
         }
         setSemesterToDelete(null);
-        setToastMsg(`${semesterToDelete.label}이 삭제되었습니다`);
+        setToastMsg(`${semesterLabel(semesterToDelete.year, semesterToDelete.semester)}이 삭제되었습니다`);
       },
       onError: () => {
         setSemesterToDelete(null);
@@ -213,7 +221,9 @@ export default function TimetableScreen() {
           style={{ gap: 4 }}
         >
           <Text className="text-sm font-bold text-gray-900">
-            {activeSemester?.label ?? '학기를 추가해주세요'}
+            {activeSemester
+              ? semesterLabel(activeSemester.year, activeSemester.semester)
+              : '학기를 추가해주세요'}
           </Text>
           <ChevronDown size={14} color="#9CA3AF" />
         </TouchableOpacity>
@@ -227,8 +237,12 @@ export default function TimetableScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* 시간표가 없는 경우 */}
-      {semesterList.length === 0 ? (
+      {/* 목록 로딩 중 */}
+      {isLoadingList ? (
+        <View className="flex-1 items-center justify-center">
+          <ActivityIndicator color="#4F6EF7" />
+        </View>
+      ) : timetables.length === 0 ? (
         <View className="flex-1 items-center justify-center px-8">
           <CalendarDays size={48} color="#D1D5DB" />
           <Text className="text-base font-bold text-gray-400 mt-4 text-center">아직 시간표가 없습니다</Text>
@@ -388,15 +402,15 @@ export default function TimetableScreen() {
               elevation: 4,
             }}
           >
-            {semesterList.map((entry) => (
-              <View key={entry.timetableId} style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 10 }}>
-                <TouchableOpacity onPress={() => selectSemester(entry)} style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 12, color: activeTimetableId === entry.timetableId ? '#4F6EF7' : '#6B7280', fontWeight: activeTimetableId === entry.timetableId ? '600' : '400' }}>
-                    {entry.label}
+            {timetables.map((t) => (
+              <View key={t.timetableId} style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 10 }}>
+                <TouchableOpacity onPress={() => selectSemester(t)} style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 12, color: activeTimetableId === t.timetableId ? '#4F6EF7' : '#6B7280', fontWeight: activeTimetableId === t.timetableId ? '600' : '400' }}>
+                    {semesterLabel(t.year, t.semester)}
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  onPress={() => { setShowSemesterPicker(false); setSemesterToDelete(entry); }}
+                  onPress={() => { setShowSemesterPicker(false); setSemesterToDelete(t); }}
                   style={{ width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginLeft: 8 }}
                 >
                   <Trash2 size={12} color="#EF4444" />
@@ -522,7 +536,9 @@ export default function TimetableScreen() {
               </View>
               <View>
                 <Text className="text-base font-bold text-gray-900">학기 삭제</Text>
-                <Text className="text-sm text-gray-400 mt-0.5">{semesterToDelete.label}</Text>
+                <Text className="text-sm text-gray-400 mt-0.5">
+                  {semesterLabel(semesterToDelete.year, semesterToDelete.semester)}
+                </Text>
               </View>
             </View>
             <Text className="text-sm text-gray-500 mb-5">
@@ -558,7 +574,7 @@ export default function TimetableScreen() {
         isVisible={showAddSemester}
         onCreated={handleSemesterCreated}
         onClose={() => setShowAddSemester(false)}
-        existingSemesters={semesterList.map(e => ({ year: e.year, semester: e.semester }))}
+        existingSemesters={timetables.map(t => ({ year: t.year, semester: t.semester }))}
       />
       <CourseSearchModal
         isVisible={showAddClass}

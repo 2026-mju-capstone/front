@@ -10,10 +10,11 @@ import {
     DefaultTheme,
     ThemeProvider,
 } from "@react-navigation/native";
-import {QueryClient} from "@tanstack/react-query";
+import {QueryClient, onlineManager} from "@tanstack/react-query";
 import {PersistQueryClientProvider} from "@tanstack/react-query-persist-client";
 import {createAsyncStoragePersister} from "@tanstack/query-async-storage-persister";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import NetInfo from "@react-native-community/netinfo";
 import {useFonts} from "expo-font";
 import {Stack, useRouter, useSegments} from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
@@ -23,6 +24,13 @@ import {GestureHandlerRootView} from "react-native-gesture-handler";
 import "react-native-reanimated";
 import {SafeAreaProvider} from "react-native-safe-area-context";
 import "../global.css";
+
+// Connect React Query's online manager to NetInfo for proper RN network detection
+onlineManager.setEventListener((setOnline) => {
+    return NetInfo.addEventListener((state) => {
+        setOnline(!!state.isConnected);
+    });
+});
 
 SplashScreen.preventAutoHideAsync();
 
@@ -78,7 +86,15 @@ export default function RootLayout() {
     return (
         <PersistQueryClientProvider
             client={queryClient}
-            persistOptions={{persister: asyncStoragePersister}}
+            persistOptions={{
+                persister: asyncStoragePersister,
+                dehydrateOptions: {
+                    // 강의 검색/시간표 데이터는 항상 서버 기준 — 캐시 저장 안 함
+                    shouldDehydrateQuery: (query) =>
+                        query.queryKey[0] !== 'courses' &&
+                        query.queryKey[0] !== 'timetables',
+                },
+            }}
         >
             <GestureHandlerRootView style={{flex: 1}}>
                 <BottomSheetModalProvider>

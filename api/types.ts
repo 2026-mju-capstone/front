@@ -103,6 +103,8 @@ export interface TimetableSummary {
     timetableId: number;
     name: string;
     isPrimary: boolean;
+    year: number;
+    semester: number;
 }
 
 export interface SyncCourseRequest {

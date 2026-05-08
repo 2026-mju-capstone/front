@@ -5,13 +5,12 @@ import {CreateTimetableRequest, SyncTimetableRequest} from '@/api/types';
 
 export const useCreateTimetable = () => {
     const queryClient = useQueryClient();
-    
+
     return useMutation({
         mutationFn: (data: CreateTimetableRequest) => timetableService.createTimetable(data),
-        onSuccess: (_, variables) => {
-            queryClient.invalidateQueries({
-                queryKey: timetableKeys.list(variables.year, variables.semester)
-            });
+        onSuccess: () => {
+            // 전체 시간표 목록을 서버에서 다시 조회
+            queryClient.invalidateQueries({queryKey: timetableKeys.allList()});
         },
     });
 };
@@ -36,7 +35,8 @@ export const useDeleteTimetable = () => {
     return useMutation({
         mutationFn: (id: number) => timetableService.deleteTimetable(id),
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: timetableKeys.all });
+            // 전체 시간표 목록을 서버에서 다시 조회
+            queryClient.invalidateQueries({queryKey: timetableKeys.allList()});
         },
     });
 };

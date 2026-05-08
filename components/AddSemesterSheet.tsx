@@ -16,7 +16,7 @@ const TERM_TO_SEMESTER: Record<string, number> = {
 
 export interface AddSemesterSheetProps {
   isVisible: boolean;
-  onCreated: (timetable: TimetableSummary, year: number, semester: number, label: string) => void;
+  onCreated: (timetable: TimetableSummary) => void;
   onClose: () => void;
   existingSemesters: Array<{ year: number; semester: number }>;
 }
@@ -38,14 +38,13 @@ export default function AddSemesterSheet({
     return { term, semesterNum, label: `${selectedYear}년 ${term}`, exists };
   });
 
-  function handleAdd(term: string, semesterNum: number) {
+  function handleAdd(semesterNum: number) {
     const yearNum = parseInt(selectedYear, 10);
-    const label = `${selectedYear}년 ${term}`;
     createTimetable(
       { name: '내 시간표', year: yearNum, semester: semesterNum },
       {
         onSuccess: (timetable) => {
-          onCreated(timetable, yearNum, semesterNum, label);
+          onCreated(timetable);
           onClose();
         },
       }
@@ -97,7 +96,7 @@ export default function AddSemesterSheet({
               {availableTerms.map(({ term, semesterNum, label, exists }) => (
                 <TouchableOpacity
                   key={term}
-                  onPress={() => !exists && !isPending && handleAdd(term, semesterNum)}
+                  onPress={() => !exists && !isPending && handleAdd(semesterNum)}
                   disabled={exists || isPending}
                   activeOpacity={0.7}
                   className="flex-row items-center justify-between px-4 py-3.5 rounded-xl"
