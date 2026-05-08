@@ -20,6 +20,10 @@ export const ITEMS_DETAIL_URL = BASE_URL + "/api/items/post/list";
 export const PROFILE_ME_URL = BASE_URL + "/api/profiles/me";
 export const USER_ACCOUNT_URL = BASE_URL + "/api/user/account";
 
+// Timetable
+export const TIMETABLES_URL = BASE_URL + "/api/timetables";
+export const COURSES_URL = BASE_URL + "/api/courses";
+
 // Chat
 export const CHAT_ROOM_URL = BASE_URL + "/api/chat/room";
 
