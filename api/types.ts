@@ -65,6 +65,61 @@ export interface UpdateProfileRequest {
     department: string;
 }
 
+// --- Pagination ---
+export interface Pageable {
+    page: number;
+    size: number;
+    sort?: string[];
+}
+
+export interface PageResponse<T> {
+    totalElements: number;
+    totalPages: number;
+    size: number;
+    content: T[];
+    number: number;
+    first: boolean;
+    last: boolean;
+    numberOfElements: number;
+    empty: boolean;
+}
+
+// --- Timetable & Course ---
+export type DayOfWeek = 'MON' | 'TUE' | 'WED' | 'THU' | 'FRI' | 'SAT' | 'SUN';
+
+export interface Course {
+    courseId: number;
+    courseName: string;
+    dayOfWeek: DayOfWeek;
+    startTime: string; // HH:mm:ss
+    endTime: string;   // HH:mm:ss
+    roomName: string;
+    buildingName: string;
+    buildingCode: string;
+    color?: string;
+}
+
+export interface TimetableSummary {
+    timetableId: number;
+    name: string;
+    isPrimary: boolean;
+}
+
+export interface SyncCourseRequest {
+    courseId: number;
+    color: string;
+}
+
+export interface SyncTimetableRequest {
+    courses: SyncCourseRequest[];
+}
+
+export interface CreateTimetableRequest {
+    name: string;
+    year: number;
+    semester: number;
+}
+
 // Image Types
 export type ImagePurpose = "ITEM";
 
