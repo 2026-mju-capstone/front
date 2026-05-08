@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, Pressable, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Plus, ChevronDown, Book, Clock, MapPin, Trash2, AlertCircle, CalendarDays } from 'lucide-react-native';
@@ -20,23 +20,39 @@ const DAYS: Array<{ key: DayOfWeek; label: string }> = [
 const START_HOUR = 9;
 const DEFAULT_END_HOUR = 18;
 
-const SUBJECT_COLORS: Record<string, { bg: string; text: string; border: string }> = {
-  '데이터구조':     { bg: '#EEF2FF', text: '#4F6EF7', border: '#C7D2FE' },
-  '운영체제':       { bg: '#FEF9C3', text: '#CA8A04', border: '#FDE68A' },
-  '알고리즘':       { bg: '#D1FAE5', text: '#059669', border: '#A7F3D0' },
-  '데이터베이스':   { bg: '#E0F2FE', text: '#0284C7', border: '#BAE6FD' },
-  '캡스톤':         { bg: '#FCE7F3', text: '#DB2777', border: '#FBCFE8' },
-  '영어회화':       { bg: '#FEF3C7', text: '#D97706', border: '#FDE68A' },
-  '소프트웨어공학': { bg: '#FFEDD5', text: '#EA580C', border: '#FED7AA' },
-  '머신러닝':       { bg: '#F3E8FF', text: '#7C3AED', border: '#D8B4FE' },
-  '웹프로그래밍':   { bg: '#EEF2FF', text: '#4F6EF7', border: '#C7D2FE' },
-  '네트워크':       { bg: '#D1FAE5', text: '#059669', border: '#A7F3D0' },
-};
-const DEFAULT_COLOR = { bg: '#EEF2FF', text: '#4F6EF7', border: '#C7D2FE' };
+type ColorSet = { bg: string; text: string; border: string };
 
-function getDisplayColor(courseName: string) {
-  const key = Object.keys(SUBJECT_COLORS).find(k => courseName.includes(k));
-  return key ? SUBJECT_COLORS[key] : DEFAULT_COLOR;
+const COLOR_PALETTE: ColorSet[] = [
+  { bg: '#EEF2FF', text: '#4F6EF7', border: '#C7D2FE' },
+  { bg: '#FEF9C3', text: '#CA8A04', border: '#FDE68A' },
+  { bg: '#D1FAE5', text: '#059669', border: '#A7F3D0' },
+  { bg: '#E0F2FE', text: '#0284C7', border: '#BAE6FD' },
+  { bg: '#FCE7F3', text: '#DB2777', border: '#FBCFE8' },
+  { bg: '#FEF3C7', text: '#D97706', border: '#FDE68A' },
+  { bg: '#FFEDD5', text: '#EA580C', border: '#FED7AA' },
+  { bg: '#F3E8FF', text: '#7C3AED', border: '#D8B4FE' },
+];
+
+const BG_TO_COLOR: Record<string, ColorSet> =
+  Object.fromEntries(COLOR_PALETTE.map(c => [c.bg, c]));
+
+function assignColor(course: Course, allCourses: Course[]): string {
+  const usedOnSameDay = new Set(
+    allCourses
+      .filter(c => c.dayOfWeek === course.dayOfWeek && c.courseId !== course.courseId && c.color)
+      .map(c => c.color!)
+  );
+  const available = COLOR_PALETTE.find(p => !usedOnSameDay.has(p.bg));
+  if (available) return available.bg;
+
+  // 팔레트 초과 시 전체에서 가장 덜 쓰인 색 배정
+  const usage = new Map<string, number>();
+  for (const c of allCourses) {
+    if (c.color) usage.set(c.color, (usage.get(c.color) ?? 0) + 1);
+  }
+  return COLOR_PALETTE.reduce((min, cur) =>
+    (usage.get(cur.bg) ?? 0) < (usage.get(min.bg) ?? 0) ? cur : min
+  ).bg;
 }
 
 function timeToMinutes(time: string) {
@@ -66,6 +82,7 @@ export default function TimetableScreen() {
   const { mutate: syncTimetable, isPending: isSyncing } = useSyncTimetable();
   const { mutate: deleteTimetable, isPending: isDeleting } = useDeleteTimetable();
 
+  const pendingActivateRef = useRef<number | null>(null);
   const [draftCourse, setDraftCourse] = useState<Course | null>(null);
   const [selectedClass, setSelectedClass] = useState<Course | null>(null);
   const [showAddClass, setShowAddClass] = useState(false);
@@ -88,6 +105,17 @@ export default function TimetableScreen() {
   // activeTimetableId가 서버 목록에 없으면 자동 보정
   useEffect(() => {
     if (isLoadingList || timetables.length === 0) return;
+
+    // 신규 생성된 학기가 리패치 목록에 나타나면 활성화
+    if (pendingActivateRef.current !== null) {
+      const pendingExists = timetables.some(t => t.timetableId === pendingActivateRef.current);
+      if (pendingExists) {
+        setActiveTimetable(pendingActivateRef.current);
+        pendingActivateRef.current = null;
+      }
+      return;
+    }
+
     const exists = timetables.some(t => t.timetableId === activeTimetableId);
     if (!exists) {
       setActiveTimetable(timetables[0]?.timetableId ?? null);
@@ -122,7 +150,7 @@ export default function TimetableScreen() {
   function buildSyncCourses(courses: Course[]) {
     return courses.map(c => ({
       courseId: c.courseId,
-      color: c.color ?? getDisplayColor(c.courseName).bg,
+      color: c.color ?? assignColor(c, courses),
     }));
   }
 
@@ -132,8 +160,8 @@ export default function TimetableScreen() {
   }
 
   function handleSemesterCreated(timetable: TimetableSummary) {
-    // 목록은 mutation의 invalidateQueries로 자동 갱신
-    setActiveTimetable(timetable.timetableId);
+    // invalidateQueries 리패치 완료 후 effect에서 활성화 (타이밍 경쟁 방지)
+    pendingActivateRef.current = timetable.timetableId;
   }
 
   function handleSelectCourse(course: Course) {
@@ -309,7 +337,7 @@ export default function TimetableScreen() {
                       const { top, height } = getPosition(cls.startTime, cls.endTime);
                       const color = isDraft
                         ? { bg: '#F3F4F6', text: '#9CA3AF', border: '#E5E7EB' }
-                        : getDisplayColor(cls.courseName);
+                        : (cls.color && BG_TO_COLOR[cls.color]) ? BG_TO_COLOR[cls.color] : COLOR_PALETTE[0];
                       return (
                         <TouchableOpacity
                           key={cls.courseId}
