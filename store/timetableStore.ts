@@ -15,15 +15,12 @@ interface TimetableState {
     setActiveTimetable: (id: number | null) => void;
     startEditing: (initialCourses: Course[]) => void;
     stopEditing: () => void;
-    addCourse: (course: Course) => boolean; // Returns false if overlap
+    addCourse: (course: Course) => boolean;
     removeCourse: (courseId: number) => void;
     updateCourseColor: (courseId: number, color: string) => void;
     clearDraft: () => void;
 }
 
-/**
- * Helper: Check if two time ranges overlap
- */
 const isOverlap = (c1: Course, c2: Course) => {
     if (c1.dayOfWeek !== c2.dayOfWeek) return false;
     
