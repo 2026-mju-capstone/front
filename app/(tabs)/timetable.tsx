@@ -1,8 +1,8 @@
 import { fonts } from "@/constants/typography";
 import { ROUTES } from "@/constants/url";
 import { useRouter } from "expo-router";
-import { Bell, ChevronDown, Plus, Save, User, X } from "lucide-react-native";
-import { useEffect, useState } from "react";
+import { Bell, ChevronDown, Plus, Save, User, X, Check } from "lucide-react-native";
+import { useEffect, useState, useCallback, useMemo } from "react";
 
 import {
   ActivityIndicator,
@@ -14,6 +14,9 @@ import {
   Text,
   TouchableOpacity,
   View,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTimetables, useTimetableDetail } from "@/hooks/queries/useTimetableQueries";
@@ -58,7 +61,7 @@ export default function TimetableScreen() {
   const { 
     currentYear, 
     currentSemester, 
-    setPeriod, // 이 부분을 추가하여 에러 해결
+    setPeriod,
     activeTimetableId, 
     setActiveTimetable, 
     draftCourses, 
@@ -76,71 +79,79 @@ export default function TimetableScreen() {
   const syncMutation = useSyncTimetable();
   const createMutation = useCreateTimetable();
 
+  // Local UI State
   const [showListModal, setShowListModal] = useState(false);
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showSearchModal, setShowSearchModal] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [newTimetableName, setNewTimetableName] = useState("");
 
-  // 학기 변경 시 자동 첫 번째 시간표 선택 (혹은 비우기)
+  // 학기 변경 시 자동 첫 번째 시간표 선택 혹은 생성 유도
   useEffect(() => {
-    if (Array.isArray(timetables) && timetables.length > 0) {
-      const exists = timetables.some(t => t.timetableId === activeTimetableId);
-      if (!exists) {
+    if (isListLoading || !Array.isArray(timetables)) return;
+
+    if (timetables.length > 0) {
+      // 해당 학기에 시간표가 있는 경우: 현재 선택된 시간표가 유효한지 확인
+      const currentValid = timetables.some(t => t.timetableId === activeTimetableId);
+      if (!currentValid) {
         const primary = timetables.find(t => t.isPrimary) || timetables[0];
         setActiveTimetable(primary.timetableId);
       }
-    } else if (Array.isArray(timetables) && timetables.length === 0) {
-      setActiveTimetable(null);
+    } else {
+      // 해당 학기에 시간표가 하나도 없는 경우: 선택 해제 및 생성 유도
+      if (activeTimetableId !== null) {
+        setActiveTimetable(null);
+      }
+      if (showListModal && !showCreateModal) {
+        setShowCreateModal(true);
+      }
     }
-  }, [timetables, currentYear, currentSemester]);
+  }, [timetables, isListLoading, showListModal, activeTimetableId, showCreateModal]);
 
-  const activeTimetableName = Array.isArray(timetables) 
-    ? (timetables.find(t => t.timetableId === activeTimetableId)?.name || "시간표")
-    : "시간표";
+  // 학기 이름 계산
+  const activeTimetableName = useMemo(() => {
+    if (!Array.isArray(timetables)) return "시간표";
+    const found = timetables.find(t => t.timetableId === activeTimetableId);
+    return found ? found.name : `${currentYear}년 ${currentSemester}학기`;
+  }, [timetables, activeTimetableId, currentYear, currentSemester]);
 
+  // 시간표 생성 핸들러
   const handleCreateTimetable = () => {
-    Alert.prompt(
-      "새 시간표",
-      "시간표 이름을 입력해주세요.",
-      [
-        { text: "취소", style: "cancel" },
-        { 
-          text: "생성", 
-          onPress: (name?: string) => {
-            if (!name) return;
-            createMutation.mutate({
-              name,
-              year: currentYear,
-              semester: currentSemester
-            }, {
-              onSuccess: (newTimetable) => {
-                setActiveTimetable(newTimetable.timetableId);
-                Alert.alert("알림", `"${name}" 시간표가 생성되었습니다.`);
-              }
-            });
-          } 
-        }
-      ]
-    );
+    if (!newTimetableName.trim()) return;
+    
+    createMutation.mutate({
+      name: newTimetableName.trim(),
+      year: currentYear,
+      semester: currentSemester
+    }, {
+      onSuccess: (newTimetable) => {
+        setActiveTimetable(newTimetable.timetableId);
+        setShowCreateModal(false);
+        setNewTimetableName("");
+        setShowListModal(false);
+        Alert.alert("알림", `"${newTimetableName}" 시간표가 생성되었습니다.`);
+      },
+      onError: (error: any) => {
+        Alert.alert("에러", error.response?.data?.error || "생성에 실패했습니다.");
+      }
+    });
   };
 
-  const handleCoursePress = (course: Course) => {
-    setSelectedCourse(course);
-    setShowDetailModal(true);
-  };
+  const closeDetailModal = useCallback(() => {
+    setShowDetailModal(false);
+    setTimeout(() => setSelectedCourse(null), 300);
+  }, []);
 
   const handleToggleEdit = () => {
     if (isEditing) {
-      // 저장 (Sync)
       if (!activeTimetableId) return;
-      
       const syncData = {
         courses: draftCourses.map(c => ({
           courseId: c.courseId,
           color: c.color || SUBJECT_COLORS[0].text
         }))
       };
-
       syncMutation.mutate({ id: activeTimetableId, data: syncData }, {
         onSuccess: () => {
           stopEditing();
@@ -155,17 +166,53 @@ export default function TimetableScreen() {
     }
   };
 
-  const handleDeleteFromDraft = (id: number) => {
+  const handleDeleteFromDraft = useCallback((id: number) => {
     removeCourse(id);
-    setShowDetailModal(false);
-  };
+    closeDetailModal();
+  }, [removeCourse, closeDetailModal]);
 
-  // 현재 보여줄 강의 목록 (편집 중이면 draft, 아니면 서버 데이터)
+  // --- Sub-components (Render Functions) ---
+
+  const renderPeriodSelector = () => (
+    <View style={styles.periodSelectorRow}>
+      <View style={styles.periodGroup}>
+        {[2024, 2025, 2026].map(y => (
+          <TouchableOpacity 
+            key={y}
+            onPress={() => {
+              if (currentYear !== y) setPeriod(y, currentSemester);
+            }}
+            style={[styles.periodTab, currentYear === y && styles.periodTabActive]}
+          >
+            <Text style={[styles.periodTabText, currentYear === y && styles.periodTabTextActive]}>
+              {y}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+      <View style={[styles.periodGroup, { marginLeft: 8 }]}>
+        {[1, 2].map(s => (
+          <TouchableOpacity 
+            key={s}
+            onPress={() => {
+              if (currentSemester !== s) setPeriod(currentYear, s);
+            }}
+            style={[styles.periodTab, currentSemester === s && styles.periodTabActive]}
+          >
+            <Text style={[styles.periodTabText, currentSemester === s && styles.periodTabTextActive]}>
+              {s}학기
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    </View>
+  );
+
   const displayCourses = isEditing ? draftCourses : (serverCourses || []);
 
   if (isListLoading && !timetables) {
     return (
-      <View className="flex-1 items-center justify-center bg-white">
+      <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#6366f1" />
       </View>
     );
@@ -177,55 +224,44 @@ export default function TimetableScreen() {
       <View style={styles.header}>
         <Text style={styles.headerTitle}>시간표</Text>
         <View style={styles.headerIcons}>
-          <TouchableOpacity
-            style={styles.iconBtn}
-            onPress={() => router.push(ROUTES.NOTIFICATION)}
-          >
+          <TouchableOpacity style={styles.iconBtn} onPress={() => router.push(ROUTES.NOTIFICATION)}>
             <Bell size={20} color="#444" />
           </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.iconBtn}
-            onPress={() => router.push(ROUTES.MYPAGE)}
-          >
+          <TouchableOpacity style={styles.iconBtn} onPress={() => router.push(ROUTES.MYPAGE)}>
             <User size={20} color="#444" />
           </TouchableOpacity>
         </View>
       </View>
 
       {/* 시간표 선택 및 편집 버튼 */}
-      <View className="flex-row items-center justify-between px-5 py-2 border-b border-gray-50">
-        <View className="flex-row items-center gap-2">
-          <TouchableOpacity
-            style={styles.semesterBtn}
-            onPress={() => setShowListModal(true)}
-          >
-            <Text style={styles.semesterText}>{activeTimetableName}</Text>
-            <ChevronDown size={14} color="#6366f1" />
-          </TouchableOpacity>
-        </View>
+      <View style={styles.actionHeader}>
+        <TouchableOpacity
+          style={styles.semesterBtn}
+          onPress={() => setShowListModal(true)}
+        >
+          <Text style={styles.semesterText}>{activeTimetableName}</Text>
+          <ChevronDown size={14} color="#6366f1" />
+        </TouchableOpacity>
 
-        <View className="flex-row items-center gap-2">
+        <View style={styles.editControls}>
           {isEditing && (
-            <TouchableOpacity 
-              className="bg-gray-100 p-2 rounded-full"
-              onPress={stopEditing}
-            >
+            <TouchableOpacity style={styles.cancelEditBtn} onPress={stopEditing}>
               <X size={18} color="#666" />
             </TouchableOpacity>
           )}
           <TouchableOpacity
-            className={`flex-row items-center px-4 py-2 rounded-full ${isEditing ? 'bg-indigo-600' : 'bg-indigo-50'}`}
+            style={[styles.toggleEditBtn, isEditing ? styles.saveBtn : styles.editBtn]}
             onPress={handleToggleEdit}
           >
             {isEditing ? (
               <>
                 <Save size={14} color="white" />
-                <Text className="text-white font-pretendard-bold ml-1 text-xs">저장</Text>
+                <Text style={styles.saveBtnText}>저장</Text>
               </>
             ) : (
               <>
                 <Plus size={14} color="#6366f1" />
-                <Text className="text-indigo-600 font-pretendard-bold ml-1 text-xs">편집</Text>
+                <Text style={styles.editBtnText}>편집</Text>
               </>
             )}
           </TouchableOpacity>
@@ -265,35 +301,34 @@ export default function TimetableScreen() {
                 .map((course) => {
                   const startMins = toMinutes(course.startTime);
                   const endMins = toMinutes(course.endTime);
-                  
                   const top = ((startMins - 9 * 60) / 60) * CELL_HEIGHT;
                   const height = ((endMins - startMins) / 60) * CELL_HEIGHT;
                   
-                  // 색상 결정: 저장된 색상이 있으면 쓰고, 없으면 ID 기반으로 지정
                   const color = course.color 
-                    ? { bg: course.color + '20', text: course.color } 
+                    ? { bg: course.color + '30', text: course.color } 
                     : SUBJECT_COLORS[course.courseId % SUBJECT_COLORS.length];
 
                   return (
                     <TouchableOpacity
-                      key={course.courseId}
+                      key={`${course.courseId}-${course.dayOfWeek}`}
                       style={[
                         styles.subjectBlock,
-                        { top, height: height - 1, backgroundColor: color.bg },
+                        { 
+                          top, height: height - 1, backgroundColor: color.bg,
+                          borderLeftWidth: 4, borderLeftColor: color.text,
+                        },
+                        isEditing ? styles.editingBlock : undefined
                       ]}
-                      onPress={() => handleCoursePress(course)}
+                      onPress={() => {
+                        setSelectedCourse(course);
+                        setShowDetailModal(true);
+                      }}
                       activeOpacity={0.8}
                     >
-                      <Text
-                        style={[styles.subjectName, { color: color.text }]}
-                        numberOfLines={2}
-                      >
+                      <Text style={[styles.subjectName, { color: color.text }]} numberOfLines={2}>
                         {course.courseName}
                       </Text>
-                      <Text
-                        style={[styles.subjectRoom, { color: color.text }]}
-                        numberOfLines={1}
-                      >
+                      <Text style={[styles.subjectRoom, { color: color.text }]} numberOfLines={1}>
                         {course.roomName}
                       </Text>
                     </TouchableOpacity>
@@ -304,154 +339,70 @@ export default function TimetableScreen() {
         </View>
       </ScrollView>
 
-      {/* 시간표 목록 및 학기 선택 모달 */}
-      <Modal visible={showListModal} transparent animationType="fade">
-        <Pressable
-          style={styles.modalOverlay}
-          onPress={() => setShowListModal(false)}
-        />
-        <View
-          style={[
-            styles.semesterModalSheet,
-            { paddingBottom: insets.bottom + 16 },
-          ]}
-        >
+      {/* 1. 시간표 목록 및 학기 선택 모달 */}
+      <Modal visible={showListModal} transparent animationType="slide">
+        <Pressable style={styles.modalOverlay} onPress={() => setShowListModal(false)} />
+        <View style={[styles.semesterModalSheet, { paddingBottom: insets.bottom + 16 }]}>
           <View style={styles.sheetHandle} />
-          
-          {/* 학기 선택 (연도 & 학기) */}
-          <View className="flex-row items-center justify-between mb-6">
-            <View className="flex-row bg-gray-100 rounded-xl p-1">
-              {[2024, 2025, 2026].map(y => (
-                <TouchableOpacity 
-                  key={y}
-                  onPress={() => setPeriod(y, currentSemester)}
-                  className={`px-4 py-2 rounded-lg ${currentYear === y ? 'bg-white shadow-sm' : ''}`}
-                >
-                  <Text style={{fontFamily: currentYear === y ? fonts.bold : fonts.regular}} className={currentYear === y ? 'text-indigo-600' : 'text-gray-500'}>
-                    {y}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            <View className="flex-row bg-gray-100 rounded-xl p-1 ml-2">
-              {[1, 2].map(s => (
-                <TouchableOpacity 
-                  key={s}
-                  onPress={() => setPeriod(currentYear, s)}
-                  className={`px-4 py-2 rounded-lg ${currentSemester === s ? 'bg-white shadow-sm' : ''}`}
-                >
-                  <Text style={{fontFamily: currentSemester === s ? fonts.bold : fonts.regular}} className={currentSemester === s ? 'text-indigo-600' : 'text-gray-500'}>
-                    {s}학기
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-
-          <View className="flex-row items-center justify-between mb-2">
+          {renderPeriodSelector()}
+          <View style={styles.listModalHeader}>
             <Text style={styles.sheetTitle}>시간표 목록</Text>
             <TouchableOpacity 
-              onPress={handleCreateTimetable}
-              className="bg-indigo-50 px-3 py-1.5 rounded-lg flex-row items-center"
+              onPress={() => setShowCreateModal(true)}
+              style={styles.addTimetableBtn}
             >
               <Plus size={14} color="#6366f1" />
-              <Text style={{fontFamily: fonts.bold}} className="text-indigo-600 text-xs ml-1">추가</Text>
+              <Text style={styles.addTimetableText}>추가</Text>
             </TouchableOpacity>
           </View>
 
           <ScrollView style={{maxHeight: 300}}>
             {isListLoading ? (
-              <ActivityIndicator className="py-10" color="#6366f1" />
+              <ActivityIndicator style={{ paddingVertical: 40 }} color="#6366f1" />
             ) : Array.isArray(timetables) && timetables.length > 0 ? (
               timetables.map((t) => (
                 <TouchableOpacity
                   key={t.timetableId}
-                  style={[
-                    styles.semesterItem,
-                    activeTimetableId === t.timetableId && styles.semesterItemActive,
-                  ]}
+                  style={[styles.semesterItem, activeTimetableId === t.timetableId && styles.semesterItemActive]}
                   onPress={() => {
                     setActiveTimetable(t.timetableId);
                     setShowListModal(false);
                   }}
                 >
-                  <Text
-                    style={[
-                      styles.semesterItemText,
-                      activeTimetableId === t.timetableId && styles.semesterItemTextActive,
-                    ]}
-                  >
+                  <Text style={[styles.semesterItemText, activeTimetableId === t.timetableId && styles.semesterItemTextActive]}>
                     {t.name}
                   </Text>
-                  {activeTimetableId === t.timetableId && (
-                    <Text style={styles.semesterItemCheck}>✓</Text>
-                  )}
+                  {activeTimetableId === t.timetableId && <Check size={18} color="#6366f1" />}
                 </TouchableOpacity>
               ))
             ) : (
-              <View className="items-center justify-center py-10">
-                <Text style={{fontFamily: fonts.medium}} className="text-gray-400">등록된 시간표가 없습니다.</Text>
+              <View style={styles.emptyTimetableList}>
+                <Text style={styles.emptyTimetableText}>등록된 시간표가 없습니다.</Text>
               </View>
             )}
           </ScrollView>
         </View>
       </Modal>
 
-      {/* 과목 상세 모달 */}
+      {/* 2. 과목 상세 모달 */}
       <Modal visible={showDetailModal} transparent animationType="fade">
-        <Pressable
-          style={styles.modalOverlay}
-          onPress={() => setShowDetailModal(false)}
-        />
+        <Pressable style={styles.modalOverlay} onPress={closeDetailModal} />
         {selectedCourse && (
           <View style={styles.modalWrap}>
             <View style={styles.modalCard}>
               <View style={styles.modalHeader}>
-                <View
-                  style={[
-                    styles.modalColorDot,
-                    {
-                      backgroundColor: selectedCourse.color || SUBJECT_COLORS[selectedCourse.courseId % SUBJECT_COLORS.length].text,
-                    },
-                  ]}
-                />
+                <View style={[styles.modalColorDot, { backgroundColor: selectedCourse.color || SUBJECT_COLORS[selectedCourse.courseId % SUBJECT_COLORS.length].text }]} />
                 <Text style={styles.modalTitle}>{selectedCourse.courseName}</Text>
               </View>
               <View style={styles.modalDivider} />
-              <View style={styles.modalInfo}>
-                <Text style={styles.modalLabel}>강의실</Text>
-                <Text style={styles.modalValue}>{selectedCourse.roomName}</Text>
-              </View>
-              <View style={styles.modalInfo}>
-                <Text style={styles.modalLabel}>장소</Text>
-                <Text style={styles.modalValue}>{selectedCourse.buildingName}</Text>
-              </View>
-              <View style={styles.modalInfo}>
-                <Text style={styles.modalLabel}>요일</Text>
-                <Text style={styles.modalValue}>
-                  {DAY_LABELS[selectedCourse.dayOfWeek]}요일
-                </Text>
-              </View>
-              <View style={styles.modalInfo}>
-                <Text style={styles.modalLabel}>시간</Text>
-                <Text style={styles.modalValue}>
-                  {selectedCourse.startTime.substring(0, 5)} ~ {selectedCourse.endTime.substring(0, 5)}
-                </Text>
-              </View>
+              <View style={styles.modalInfo}><Text style={styles.modalLabel}>강의실</Text><Text style={styles.modalValue}>{selectedCourse.roomName}</Text></View>
+              <View style={styles.modalInfo}><Text style={styles.modalLabel}>장소</Text><Text style={styles.modalValue}>{selectedCourse.buildingName}</Text></View>
+              <View style={styles.modalInfo}><Text style={styles.modalLabel}>요일</Text><Text style={styles.modalValue}>{DAY_LABELS[selectedCourse.dayOfWeek]}요일</Text></View>
+              <View style={styles.modalInfo}><Text style={styles.modalLabel}>시간</Text><Text style={styles.modalValue}>{selectedCourse.startTime.substring(0, 5)} ~ {selectedCourse.endTime.substring(0, 5)}</Text></View>
               <View style={styles.modalBtnRow}>
-                <TouchableOpacity
-                  style={styles.closeBtn}
-                  onPress={() => setShowDetailModal(false)}
-                >
-                  <Text style={styles.closeBtnText}>닫기</Text>
-                </TouchableOpacity>
+                <TouchableOpacity style={styles.closeBtn} onPress={closeDetailModal}><Text style={styles.closeBtnText}>닫기</Text></TouchableOpacity>
                 {isEditing && (
-                  <TouchableOpacity
-                    style={styles.deleteBtn}
-                    onPress={() => handleDeleteFromDraft(selectedCourse.courseId)}
-                  >
-                    <Text style={styles.deleteBtnText}>제거</Text>
-                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDeleteFromDraft(selectedCourse.courseId)}><Text style={styles.deleteBtnText}>제거</Text></TouchableOpacity>
                 )}
               </View>
             </View>
@@ -459,29 +410,41 @@ export default function TimetableScreen() {
         )}
       </Modal>
 
-      {/* 강의 추가 버튼 (편집 모드일 때만 하단에 노출) */}
+      {/* 3. 시간표 생성 모달 */}
+      <Modal visible={showCreateModal} transparent animationType="fade" onRequestClose={() => setShowCreateModal(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{flex: 1}}>
+          <Pressable style={styles.modalOverlay} onPress={() => setShowCreateModal(false)} />
+          <View style={styles.modalWrap}>
+            <View style={styles.modalCard}>
+              <Text style={styles.modalTitle}>새 시간표 생성</Text>
+              <Text style={styles.modalLabel}>시간표 이름을 입력해주세요.</Text>
+              <TextInput style={styles.createInput} placeholder="예: 2026-1학기 주전공" value={newTimetableName} onChangeText={setNewTimetableName} autoFocus />
+              <View style={styles.modalBtnRow}>
+                <TouchableOpacity style={styles.closeBtn} onPress={() => setShowCreateModal(false)}><Text style={styles.closeBtnText}>취소</Text></TouchableOpacity>
+                <TouchableOpacity style={[styles.confirmBtn, !newTimetableName.trim() && {opacity: 0.5}]} onPress={handleCreateTimetable} disabled={!newTimetableName.trim()}><Text style={styles.confirmBtnText}>생성</Text></TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
       {isEditing && (
         <TouchableOpacity 
-          className="absolute right-6 bottom-6 w-14 h-14 bg-indigo-600 rounded-full items-center justify-center shadow-lg"
+          style={styles.floatingAddBtn}
           onPress={() => setShowSearchModal(true)}
         >
           <Plus size={28} color="white" />
         </TouchableOpacity>
       )}
 
-      {/* 강의 검색 모달 */}
-      <CourseSearchModal 
-        isVisible={showSearchModal}
-        onClose={() => setShowSearchModal(false)}
-        year={currentYear}
-        semester={currentSemester}
-      />
+      <CourseSearchModal isVisible={showSearchModal} onClose={() => setShowSearchModal(false)} year={currentYear} semester={currentSemester} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#fff" },
+  loadingContainer: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#fff" },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -499,6 +462,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  actionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f9fafb",
+  },
   semesterBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -510,6 +482,19 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   semesterText: { fontSize: 13, fontFamily: fonts.bold, color: "#6366f1" },
+  editControls: { flexDirection: "row", alignItems: "center", gap: 8 },
+  cancelEditBtn: { backgroundColor: "#f3f4f6", padding: 8, borderRadius: 20 },
+  toggleEditBtn: { 
+    flexDirection: "row", 
+    alignItems: "center", 
+    paddingHorizontal: 16, 
+    paddingVertical: 8, 
+    borderRadius: 20 
+  },
+  editBtn: { backgroundColor: "#f5f3ff" },
+  saveBtn: { backgroundColor: "#6366f1" },
+  editBtnText: { color: "#6366f1", fontFamily: fonts.bold, marginLeft: 4, fontSize: 12 },
+  saveBtnText: { color: "white", fontFamily: fonts.bold, marginLeft: 4, fontSize: 12 },
   dayHeader: {
     flexDirection: "row",
     paddingHorizontal: 8,
@@ -548,6 +533,14 @@ const styles = StyleSheet.create({
     borderWidth: 0.5,
     borderColor: 'rgba(255,255,255,0.5)',
   },
+  editingBlock: {
+    shadowColor: "#6366f1",
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+    borderStyle: "dashed",
+    borderWidth: 1,
+  },
   subjectName: { fontSize: 11, fontFamily: fonts.bold, lineHeight: 14 },
   subjectRoom: {
     fontSize: 9,
@@ -578,12 +571,20 @@ const styles = StyleSheet.create({
     alignSelf: "center",
     marginBottom: 16,
   },
+  periodSelectorRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 24 },
+  periodGroup: { flexDirection: "row", backgroundColor: "#f3f4f6", borderRadius: 12, padding: 4 },
+  periodTab: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8 },
+  periodTabActive: { backgroundColor: "#fff", shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 2, elevation: 1 },
+  periodTabText: { fontFamily: fonts.regular, color: "#6b7280", fontSize: 14 },
+  periodTabTextActive: { fontFamily: fonts.bold, color: "#6366f1" },
+  listModalHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 },
   sheetTitle: {
     fontSize: 15,
     fontFamily: fonts.bold,
     color: "#111",
-    marginBottom: 12,
   },
+  addTimetableBtn: { backgroundColor: "#f5f3ff", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, flexDirection: "row", alignItems: "center" },
+  addTimetableText: { fontFamily: fonts.bold, color: "#6366f1", fontSize: 12, marginLeft: 4 },
   semesterItem: {
     flexDirection: "row",
     alignItems: "center",
@@ -599,7 +600,8 @@ const styles = StyleSheet.create({
   },
   semesterItemText: { fontSize: 14, fontFamily: fonts.regular, color: "#555" },
   semesterItemTextActive: { fontFamily: fonts.bold, color: "#6366f1" },
-  semesterItemCheck: { fontSize: 14, color: "#6366f1", fontFamily: fonts.bold },
+  emptyTimetableList: { alignItems: "center", justifyContent: "center", paddingVertical: 40 },
+  emptyTimetableText: { fontFamily: fonts.medium, color: "#9ca3af", fontSize: 14 },
   modalWrap: {
     position: "absolute",
     top: 0,
@@ -654,4 +656,37 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   deleteBtnText: { fontSize: 14, fontFamily: fonts.bold, color: "#f87171" },
+  createInput: {
+    backgroundColor: "#f5f6f8",
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 15,
+    fontFamily: fonts.regular,
+    color: "#333",
+    marginTop: 8,
+  },
+  confirmBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: "#6366f1",
+    alignItems: "center",
+  },
+  confirmBtnText: { fontSize: 14, fontFamily: fonts.bold, color: "#fff" },
+  floatingAddBtn: {
+    position: "absolute",
+    right: 24,
+    bottom: 24,
+    width: 56,
+    height: 56,
+    backgroundColor: "#6366f1",
+    borderRadius: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#6366f1",
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
 });

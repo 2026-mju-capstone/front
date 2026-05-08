@@ -31,7 +31,7 @@ export default function VerifyStep() {
   const [codeError, setCodeError] = useState("");
   const [timer, setTimer] = useState(180);
   const [canResend, setCanResend] = useState(false);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const sendCertificationMutation = useSendCertification();
   const verifyCodeMutation = useVerifyCode();

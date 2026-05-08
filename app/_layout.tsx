@@ -1,3 +1,5 @@
+import GlobalLoading from "@/app/global-loading";
+import LoadingScreen from "@/app/loading";
 import {ROUTES} from "@/constants/url";
 import {useColorScheme} from "@/hooks/use-color-scheme";
 import {useNotifications} from "@/hooks/use-notifications";
@@ -51,9 +53,9 @@ export default function RootLayout() {
         }
     }, [token, isInitialized, segments, fontsLoaded]);
 
-    // 초기화 중이거나 폰트 로딩 중이면 스플래시 화면 유지
+    // 초기화 중이거나 폰트 로딩 중이면 스플래시 화면 유지 대신 커스텀 로딩 화면 표시
     if (!isInitialized || !fontsLoaded) {
-        return null;
+        return <LoadingScreen />;
     }
 
     // 로딩 완료 시 스플래시 숨기기
@@ -89,6 +91,7 @@ export default function RootLayout() {
                                     options={{headerShown: false}}
                                 />
                             </Stack>
+                            <GlobalLoading />
                             <StatusBar style="auto"/>
                         </ThemeProvider>
                     </SafeAreaProvider>

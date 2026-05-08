@@ -7,10 +7,11 @@ import {
     TouchableOpacity,
     FlatList,
     ActivityIndicator,
-    Pressable,
-    Alert
+    Alert,
+    StyleSheet,
+    Platform
 } from 'react-native';
-import {Search, X, Plus} from 'lucide-react-native';
+import {Search, X, Plus, CheckCircle2} from 'lucide-react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useSearchCourses} from '@/hooks/queries/useTimetableQueries';
 import {useTimetableStore} from '@/store/timetableStore';
@@ -38,8 +39,8 @@ const DAY_LABELS: Record<string, string> = {
 export default function CourseSearchModal({isVisible, onClose, year, semester}: CourseSearchModalProps) {
     const insets = useSafeAreaInsets();
     const [keyword, setKeyword] = useState('');
-    const debouncedKeyword = useDebounce(keyword, 500); // 500ms 디바운스 적용
-    const {addCourse} = useTimetableStore();
+    const debouncedKeyword = useDebounce(keyword, 500);
+    const {addCourse, draftCourses} = useTimetableStore();
 
     const {
         data,
@@ -47,7 +48,6 @@ export default function CourseSearchModal({isVisible, onClose, year, semester}: 
         hasNextPage,
         isFetchingNextPage,
         isLoading,
-        isError
     } = useSearchCourses(year, semester, debouncedKeyword);
 
     const allCourses = useMemo(() => {
@@ -57,62 +57,75 @@ export default function CourseSearchModal({isVisible, onClose, year, semester}: 
     const handleAddCourse = (course: Course) => {
         const success = addCourse(course);
         if (success) {
-            Alert.alert("성공", `"${course.courseName}" 강의가 추가되었습니다.`);
+            // 시각적 피드백을 위해 별도의 알림 대신 상태로 보여줄 수도 있지만, 
+            // 현재는 간단히 Alert으로 유지하거나 아래 아이콘 변화로 대체
         } else {
-            Alert.alert("경고", "해당 시간에 이미 다른 강의가 있습니다.");
+            Alert.alert("중복 시간", "해당 시간에 이미 다른 강의가 있습니다.");
         }
     };
 
-    const renderItem = ({item}: {item: Course}) => (
-        <View className="flex-row items-center justify-between p-4 border-b border-gray-50 bg-white">
-            <View className="flex-1 mr-4">
-                <Text style={{fontFamily: fonts.bold}} className="text-base text-gray-900">
-                    {item.courseName}
-                </Text>
-                <Text style={{fontFamily: fonts.regular}} className="text-xs text-indigo-600 mt-1">
-                    {item.buildingName} {item.roomName}
-                </Text>
-                <Text style={{fontFamily: fonts.regular}} className="text-xs text-gray-500 mt-0.5">
-                    {DAY_LABELS[item.dayOfWeek]} {item.startTime.substring(0, 5)} ~ {item.endTime.substring(0, 5)}
-                </Text>
+    const renderItem = ({item}: {item: Course}) => {
+        const isAdded = draftCourses.some(c => c.courseId === item.courseId);
+        
+        return (
+            <View style={styles.courseItem}>
+                <View style={styles.courseInfo}>
+                    <Text style={styles.courseName}>
+                        {item.courseName}
+                    </Text>
+                    <View className="flex-row items-center mt-1">
+                        <Text style={styles.courseSubInfo}>
+                            {item.buildingName} {item.roomName}
+                        </Text>
+                        <View style={styles.dot} />
+                        <Text style={styles.courseSubInfo}>
+                            {DAY_LABELS[item.dayOfWeek]} {item.startTime.substring(0, 5)} ~ {item.endTime.substring(0, 5)}
+                        </Text>
+                    </View>
+                </View>
+                <TouchableOpacity 
+                    style={[styles.addBtn, isAdded && styles.addedBtn]}
+                    onPress={() => !isAdded && handleAddCourse(item)}
+                    disabled={isAdded}
+                >
+                    {isAdded ? (
+                        <CheckCircle2 size={20} color="#6366f1" />
+                    ) : (
+                        <Plus size={20} color="#6366f1" />
+                    )}
+                </TouchableOpacity>
             </View>
-            <TouchableOpacity 
-                className="bg-indigo-50 p-2 rounded-full"
-                onPress={() => handleAddCourse(item)}
-            >
-                <Plus size={20} color="#6366f1" />
-            </TouchableOpacity>
-        </View>
-    );
+        );
+    };
 
     return (
-        <Modal visible={isVisible} animationType="slide" transparent={false}>
-            <View style={{flex: 1, paddingTop: insets.top, backgroundColor: '#fff'}}>
+        <Modal 
+            visible={isVisible} 
+            animationType="slide" 
+            presentationStyle="pageSheet" // iOS에서 시각적으로 "더 높은" 느낌과 제스처 지원
+            onRequestClose={onClose}
+        >
+            <View style={[styles.container, { paddingTop: Platform.OS === 'ios' ? 20 : insets.top }]}>
                 {/* Header */}
-                <View className="flex-row items-center justify-between px-4 py-3 border-b border-gray-100">
-                    <Text style={{fontFamily: fonts.bold}} className="text-lg text-gray-900">강의 추가</Text>
-                    <TouchableOpacity onPress={onClose} className="p-1">
+                <View style={styles.header}>
+                    <Text style={styles.headerTitle}>강의 추가</Text>
+                    <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
                         <X size={24} color="#111" />
                     </TouchableOpacity>
                 </View>
 
                 {/* Search Bar */}
-                <View className="px-4 py-3 bg-gray-50">
-                    <View className="flex-row items-center bg-white px-3 py-2 rounded-xl border border-gray-200">
+                <View style={styles.searchBarWrapper}>
+                    <View style={styles.searchBar}>
                         <Search size={18} color="#999" />
                         <TextInput
                             placeholder="강의명 검색 (2글자 이상)"
-                            className="flex-1 ml-2 text-sm text-gray-900"
-                            style={{fontFamily: fonts.regular}}
+                            style={styles.input}
                             value={keyword}
                             onChangeText={setKeyword}
                             autoCorrect={false}
+                            clearButtonMode="while-editing"
                         />
-                        {keyword.length > 0 && (
-                            <TouchableOpacity onPress={() => setKeyword('')}>
-                                <X size={16} color="#ccc" />
-                            </TouchableOpacity>
-                        )}
                     </View>
                 </View>
 
@@ -120,20 +133,20 @@ export default function CourseSearchModal({isVisible, onClose, year, semester}: 
                 <FlatList
                     data={allCourses}
                     renderItem={renderItem}
-                    keyExtractor={(item, index) => `${item.courseId}-${index}`}
+                    keyExtractor={(item) => item.courseId.toString()}
                     contentContainerStyle={{paddingBottom: insets.bottom + 20}}
                     onEndReached={() => {
                         if (hasNextPage) fetchNextPage();
                     }}
                     onEndReachedThreshold={0.5}
                     ListEmptyComponent={
-                        <View className="flex-1 items-center justify-center py-20">
+                        <View style={styles.emptyContainer}>
                             {isLoading ? (
                                 <ActivityIndicator color="#6366f1" />
                             ) : keyword.length < 2 ? (
-                                <Text style={{fontFamily: fonts.medium}} className="text-gray-400">검색어를 입력해주세요.</Text>
+                                <Text style={styles.emptyText}>검색어를 입력해주세요.</Text>
                             ) : (
-                                <Text style={{fontFamily: fonts.medium}} className="text-gray-400">검색 결과가 없습니다.</Text>
+                                <Text style={styles.emptyText}>검색 결과가 없습니다.</Text>
                             )}
                         </View>
                     }
@@ -149,3 +162,60 @@ export default function CourseSearchModal({isVisible, onClose, year, semester}: 
         </Modal>
     );
 }
+
+const styles = StyleSheet.create({
+    container: { flex: 1, backgroundColor: '#fff' },
+    header: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 20,
+        paddingVertical: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: '#f3f4f6',
+    },
+    headerTitle: { fontSize: 18, fontFamily: fonts.bold, color: '#111' },
+    closeBtn: { padding: 4 },
+    searchBarWrapper: { paddingHorizontal: 20, paddingVertical: 12, backgroundColor: '#f9fafb' },
+    searchBar: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#fff',
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+        borderRadius: 14,
+        borderWidth: 1,
+        borderColor: '#e5e7eb',
+    },
+    input: {
+        flex: 1,
+        marginLeft: 8,
+        fontSize: 14,
+        fontFamily: fonts.regular,
+        color: '#111',
+    },
+    courseItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 20,
+        paddingVertical: 18,
+        borderBottomWidth: 1,
+        borderBottomColor: '#f3f4f6',
+    },
+    courseInfo: { flex: 1, marginRight: 12 },
+    courseName: { fontSize: 16, fontFamily: fonts.bold, color: '#111' },
+    courseSubInfo: { fontSize: 12, fontFamily: fonts.regular, color: '#666' },
+    dot: { width: 3, height: 3, borderRadius: 1.5, backgroundColor: '#ccc', marginHorizontal: 6 },
+    addBtn: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: '#f5f3ff',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    addedBtn: { backgroundColor: '#eef2ff' },
+    emptyContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 100 },
+    emptyText: { fontSize: 14, fontFamily: fonts.medium, color: '#aaa', textAlign: 'center' },
+});
