@@ -1,12 +1,11 @@
 import { fonts } from "@/constants/typography";
+import { ROUTES } from "@/constants/url";
 import { useLogin } from "@/hooks/mutations/useAuthMutations";
 import { getFCMToken, sendTokenToServer } from "@/hooks/use-notifications";
 import { useAuthStore } from "@/store/authStore";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { AlertCircle, Eye, EyeOff, Lock, Mail, X } from "lucide-react-native";
-import { ROUTES } from "@/constants/url";
 import { useState } from "react";
 import {
   ActivityIndicator,
@@ -59,13 +58,16 @@ export default function LoginPage() {
         onSuccess: async (result) => {
           if (result.success) {
             Keyboard.dismiss();
-            console.log("Login Success! Received Token:", result.data.accessToken);
+            console.log(
+              "Login Success! Received Token:",
+              result.data.accessToken,
+            );
             // zustand 스토어 사용 (자동으로 AsyncStorage에 저장됨)
             useAuthStore.getState().setToken(result.data.accessToken);
-            
+
             await getFCMToken(sendTokenToServer);
-            
-            // _layout.tsx의 가드 로직이 리다이렉트를 처리하지만, 
+
+            // _layout.tsx의 가드 로직이 리다이렉트를 처리하지만,
             // 사용자 경험을 위해 명시적으로 이동합니다.
             router.replace(ROUTES.MAP);
           } else {
@@ -244,9 +246,7 @@ export default function LoginPage() {
             <TouchableOpacity>
               <Text style={styles.linkText}>아이디/비밀번호 찾기</Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => router.push(ROUTES.SIGNUP)}
-            >
+            <TouchableOpacity onPress={() => router.push(ROUTES.SIGNUP)}>
               <Text style={styles.linkTextBold}>회원가입</Text>
             </TouchableOpacity>
           </View>

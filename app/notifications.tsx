@@ -1,4 +1,6 @@
+import client from "@/api/client";
 import { fonts } from "@/constants/typography";
+import { ROUTES } from "@/constants/url";
 import { useRouter } from "expo-router";
 import {
   AlertTriangle,
@@ -11,7 +13,6 @@ import {
 } from "lucide-react-native";
 import { useEffect, useState } from "react";
 import {
-  ActivityIndicator,
   FlatList,
   RefreshControl,
   StyleSheet,
@@ -39,26 +40,31 @@ const NOTIFICATION_CONFIG = {
     icon: Sparkles,
     label: "매칭 완료",
     message: "분실물과 매칭되었어요! 확인해보세요.",
+    route: ROUTES.LOST_ITEM_BOARD,
   },
   CHAT_MESSAGE: {
     icon: MessageCircle,
     label: "새 메시지",
     message: "새로운 채팅 메시지가 있어요.",
+    route: ROUTES.CHAT,
   },
   ITEM_RETURNED: {
     icon: CheckCircle,
     label: "반환 완료",
     message: "물건이 성공적으로 반환되었어요.",
+    route: ROUTES.CHAT,
   },
   THEFT_SUSPECTED: {
     icon: AlertTriangle,
     label: "도난 의심",
     message: "물건에 도난 의심 정황이 감지되었어요.",
+    route: ROUTES.LOST_ITEM_BOARD,
   },
   LOCKER_READY: {
     icon: Package,
     label: "보관함 준비",
     message: "사물함이 준비되었어요. QR을 스캔해 물건을 꺼내세요.",
+    route: ROUTES.SCAN,
   },
 };
 
@@ -76,7 +82,6 @@ export default function NotificationsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const [notifications, setNotifications] = useState<NotificationRecord[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
@@ -84,51 +89,17 @@ export default function NotificationsScreen() {
   }, []);
 
   const fetchNotifications = async () => {
-    setIsLoading(true);
     try {
-      // TODO: 실제 API 연결 후 아래 더미데이터 제거
-      const dummyData: NotificationRecord[] = [
-        {
-          id: 1,
-          type: "MATCH_FOUND",
-          payload: {},
-          read_at: null,
-          created_at: new Date(Date.now() - 1000 * 60 * 3).toISOString(),
-        },
-        {
-          id: 2,
-          type: "CHAT_MESSAGE",
-          payload: {},
-          read_at: null,
-          created_at: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
-        },
-        {
-          id: 3,
-          type: "LOCKER_READY",
-          payload: {},
-          read_at: new Date().toISOString(),
-          created_at: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
-        },
-        {
-          id: 4,
-          type: "ITEM_RETURNED",
-          payload: {},
-          read_at: new Date().toISOString(),
-          created_at: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
-        },
-        {
-          id: 5,
-          type: "THEFT_SUSPECTED",
-          payload: {},
-          read_at: new Date().toISOString(),
-          created_at: new Date(Date.now() - 1000 * 60 * 60 * 25).toISOString(),
-        },
-      ];
-      setNotifications(dummyData);
+      const res = await client.get("/api/notifications");
+      if (res.data.success && res.data.data) {
+        setNotifications(res.data.data);
+      } else {
+        setNotifications([]);
+      }
     } catch (e) {
+      console.error("알림 조회 실패", e);
       setNotifications([]);
     } finally {
-      setIsLoading(false);
       setIsRefreshing(false);
     }
   };
@@ -139,10 +110,37 @@ export default function NotificationsScreen() {
   };
 
   const handleMarkAllRead = async () => {
-    // TODO: PATCH /api/notifications/mark-as-read 연결
-    setNotifications((prev) =>
-      prev.map((n) => ({ ...n, read_at: new Date().toISOString() })),
-    );
+    try {
+      const unreadIds = notifications
+        .filter((n) => !n.read_at)
+        .map((n) => n.id);
+      if (unreadIds.length === 0) return;
+      await client.patch("/api/notifications/mark-as-read", {
+        notification_ids: unreadIds,
+      });
+      setNotifications((prev) =>
+        prev.map((n) => ({ ...n, read_at: new Date().toISOString() })),
+      );
+    } catch (e) {
+      console.error("알림 읽음 처리 실패", e);
+    }
+  };
+
+  const handleNotifPress = async (item: NotificationRecord) => {
+    try {
+      if (!item.read_at) {
+        await client.patch(`/api/notifications/${item.id}/mark-as-read`);
+        setNotifications((prev) =>
+          prev.map((n) =>
+            n.id === item.id ? { ...n, read_at: new Date().toISOString() } : n,
+          ),
+        );
+      }
+    } catch (e) {
+      console.error("알림 읽음 처리 실패", e);
+    }
+    const config = NOTIFICATION_CONFIG[item.type];
+    router.push(config.route as any);
   };
 
   const unreadCount = notifications.filter((n) => !n.read_at).length;
@@ -167,7 +165,6 @@ export default function NotificationsScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      {/* 헤더 */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <ChevronLeft size={22} color="#333" />
@@ -176,93 +173,85 @@ export default function NotificationsScreen() {
         <View style={{ width: 36 }} />
       </View>
 
-      {isLoading ? (
-        <View style={styles.loadingBox}>
-          <ActivityIndicator color="#6366f1" />
-        </View>
-      ) : (
-        <FlatList
-          data={notifications}
-          keyExtractor={(item) => String(item.id)}
-          contentContainerStyle={[
-            styles.listContent,
-            notifications.length === 0 && styles.listContentEmpty,
-          ]}
-          showsVerticalScrollIndicator={false}
-          ListHeaderComponent={<ListHeader />}
-          refreshControl={
-            <RefreshControl
-              refreshing={isRefreshing}
-              onRefresh={onRefresh}
-              colors={["#6366f1"]}
-              tintColor="#6366f1"
-            />
-          }
-          ListEmptyComponent={
-            <View style={styles.emptyBox}>
-              <View style={styles.emptyIconWrap}>
-                <BellOff size={32} color="#6366f1" />
-              </View>
-              <Text style={styles.emptyTitle}>알림이 없어요</Text>
-              <Text style={styles.emptyDesc}>
-                새로운 알림이 오면 여기에 표시돼요
-              </Text>
+      <FlatList
+        data={notifications}
+        keyExtractor={(item) => String(item.id)}
+        contentContainerStyle={[
+          styles.listContent,
+          notifications.length === 0 && styles.listContentEmpty,
+        ]}
+        showsVerticalScrollIndicator={false}
+        ListHeaderComponent={<ListHeader />}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={onRefresh}
+            colors={["#6366f1"]}
+            tintColor="#6366f1"
+          />
+        }
+        ListEmptyComponent={
+          <View style={styles.emptyBox}>
+            <View style={styles.emptyIconWrap}>
+              <BellOff size={32} color="#6366f1" />
             </View>
-          }
-          renderItem={({ item }) => {
-            const config = NOTIFICATION_CONFIG[item.type];
-            const IconComponent = config.icon;
-            const isUnread = !item.read_at;
+            <Text style={styles.emptyTitle}>알림이 없어요</Text>
+            <Text style={styles.emptyDesc}>
+              새로운 알림이 오면 여기에 표시돼요
+            </Text>
+          </View>
+        }
+        renderItem={({ item }) => {
+          const config = NOTIFICATION_CONFIG[item.type];
+          const IconComponent = config.icon;
+          const isUnread = !item.read_at;
 
-            return (
-              <TouchableOpacity
-                style={[styles.notifCard, isUnread && styles.notifCardUnread]}
-                activeOpacity={0.7}
-                onPress={() => {
-                  // TODO: 알림 타입별 화면 이동
-                }}
+          return (
+            <TouchableOpacity
+              style={[styles.notifCard, isUnread && styles.notifCardUnread]}
+              activeOpacity={0.7}
+              onPress={() => handleNotifPress(item)}
+            >
+              <View
+                style={[
+                  styles.iconWrap,
+                  isUnread ? styles.iconWrapUnread : styles.iconWrapRead,
+                ]}
               >
-                <View
-                  style={[
-                    styles.iconWrap,
-                    isUnread ? styles.iconWrapUnread : styles.iconWrapRead,
-                  ]}
-                >
-                  <IconComponent
-                    size={22}
-                    color={isUnread ? "#6366f1" : "#bbb"}
-                  />
-                </View>
-                <View style={styles.notifInfo}>
-                  <View style={styles.notifTopRow}>
-                    <Text
-                      style={[
-                        styles.notifLabel,
-                        !isUnread && styles.notifLabelRead,
-                      ]}
-                    >
-                      {config.label}
-                    </Text>
-                    <Text style={styles.notifTime}>
-                      {timeAgo(item.created_at)}
-                    </Text>
-                  </View>
+                <IconComponent
+                  size={22}
+                  color={isUnread ? "#6366f1" : "#bbb"}
+                />
+              </View>
+              <View style={styles.notifInfo}>
+                <View style={styles.notifTopRow}>
                   <Text
                     style={[
-                      styles.notifMessage,
-                      !isUnread && styles.notifMessageRead,
+                      styles.notifLabel,
+                      !isUnread && styles.notifLabelRead,
                     ]}
-                    numberOfLines={2}
                   >
-                    {config.message}
+                    {config.label}
+                  </Text>
+                  <Text style={styles.notifTime}>
+                    {timeAgo(item.created_at)}
                   </Text>
                 </View>
-                {isUnread && <View style={styles.unreadDot} />}
-              </TouchableOpacity>
-            );
-          }}
-        />
-      )}
+                <Text
+                  style={[
+                    styles.notifMessage,
+                    !isUnread && styles.notifMessageRead,
+                  ]}
+                  numberOfLines={2}
+                >
+                  {config.message}
+                </Text>
+              </View>
+              {isUnread && <View style={styles.unreadDot} />}
+            </TouchableOpacity>
+          );
+        }}
+      />
     </View>
   );
 }
@@ -286,11 +275,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   headerTitle: { fontSize: 16, fontFamily: fonts.bold, color: "#111" },
-  loadingBox: { flex: 1, alignItems: "center", justifyContent: "center" },
   listContent: { paddingBottom: 40 },
   listContentEmpty: { flex: 1 },
-
-  // 목록 상단 섹션
   listHeader: {
     flexDirection: "row",
     alignItems: "center",
@@ -299,27 +285,15 @@ const styles = StyleSheet.create({
     paddingTop: 20,
     paddingBottom: 12,
   },
-  listHeaderLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  listHeaderTitle: {
-    fontSize: 15,
-    fontFamily: fonts.bold,
-    color: "#111",
-  },
+  listHeaderLeft: { flexDirection: "row", alignItems: "center", gap: 8 },
+  listHeaderTitle: { fontSize: 15, fontFamily: fonts.bold, color: "#111" },
   unreadBadge: {
     backgroundColor: "#eef2ff",
     borderRadius: 20,
     paddingHorizontal: 8,
     paddingVertical: 3,
   },
-  unreadBadgeText: {
-    fontSize: 11,
-    fontFamily: fonts.bold,
-    color: "#6366f1",
-  },
+  unreadBadgeText: { fontSize: 11, fontFamily: fonts.bold, color: "#6366f1" },
   readAllBtn: {
     paddingHorizontal: 12,
     paddingVertical: 6,
@@ -327,8 +301,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#f5f6f8",
   },
   readAllText: { fontSize: 12, fontFamily: fonts.bold, color: "#555" },
-
-  // 알림 카드
   notifCard: {
     flexDirection: "row",
     alignItems: "center",
@@ -371,8 +343,6 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: "#6366f1",
   },
-
-  // 빈 상태
   emptyBox: {
     flex: 1,
     alignItems: "center",
