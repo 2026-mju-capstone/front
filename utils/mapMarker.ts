@@ -1,6 +1,4 @@
-/**
- * 카카오맵 CustomOverlay에 주입할 HTML 문자열을 생성하는 유틸리티
- */
+//카카오맵 CustomOverlay에 주입할 HTML 문자열을 생성하는 유틸리티
 export function getBuildingMarkerHtml(
   buildingId: number,
   name: string,
