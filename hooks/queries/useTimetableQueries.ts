@@ -4,8 +4,17 @@ import {timetableService} from '@/api/services/timetable';
 export const timetableKeys = {
     all: ['timetables'] as const,
     allList: () => [...timetableKeys.all, 'list'] as const,
+    primary: () => [...timetableKeys.all, 'primary'] as const,
     detail: (id: number) => [...timetableKeys.all, 'detail', id] as const,
     courses: (year: number, semester: number, keyword: string) => ['courses', year, semester, keyword] as const,
+};
+
+export const usePrimaryTimetable = () => {
+    return useQuery({
+        queryKey: timetableKeys.primary(),
+        queryFn: () => timetableService.getPrimaryTimetable(),
+        staleTime: 0,
+    });
 };
 
 // 서버에서 전체 시간표 목록을 항상 새로 조회 (캐시 없음)

@@ -87,16 +87,20 @@ export interface PageResponse<T> {
 // --- Timetable & Course ---
 export type DayOfWeek = 'MON' | 'TUE' | 'WED' | 'THU' | 'FRI' | 'SAT' | 'SUN';
 
-export interface Course {
-    courseId: number;
-    courseName: string;
+export interface CourseSchedule {
     dayOfWeek: DayOfWeek;
     startTime: string; // HH:mm:ss
     endTime: string;   // HH:mm:ss
+}
+
+export interface Course {
+    courseId: number;
+    courseName: string;
     roomName: string;
     buildingName: string;
     buildingCode: string;
     color?: string;
+    schedules: CourseSchedule[];
 }
 
 export interface TimetableSummary {

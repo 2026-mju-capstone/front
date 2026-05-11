@@ -25,6 +25,11 @@ export const timetableService = {
         return response.data.data;
     },
 
+    getPrimaryTimetable: async () => {
+        const response = await axiosInstance.get<ApiResponse<TimetableSummary>>(`${TIMETABLES_URL}/primary`);
+        return response.data.data;
+    },
+
     getAllTimetables: async () => {
         const response = await axiosInstance.get<ApiResponse<TimetableSummary[]>>(`${TIMETABLES_URL}/mine`);
         return response.data.data;

@@ -37,9 +37,11 @@ const BG_TO_COLOR: Record<string, ColorSet> =
   Object.fromEntries(COLOR_PALETTE.map(c => [c.bg, c]));
 
 function assignColor(course: Course, allCourses: Course[]): string {
+  const courseDays = new Set(course.schedules.map(s => s.dayOfWeek));
   const usedOnSameDay = new Set(
     allCourses
-      .filter(c => c.dayOfWeek === course.dayOfWeek && c.courseId !== course.courseId && c.color)
+      .filter(c => c.courseId !== course.courseId && c.color &&
+        c.schedules.some(s => courseDays.has(s.dayOfWeek)))
       .map(c => c.color!)
   );
   const available = COLOR_PALETTE.find(p => !usedOnSameDay.has(p.bg));
@@ -128,10 +130,12 @@ export default function TimetableScreen() {
   }, [savedCourses, draftCourse]);
 
   const endHour = useMemo(() => {
-    const last = displayData.reduce((max, cls) => {
-      const h = parseInt(cls.endTime.split(':')[0], 10);
-      return h > max ? h : max;
-    }, DEFAULT_END_HOUR);
+    const last = displayData.reduce((max, cls) =>
+      cls.schedules.reduce((m, s) => {
+        const h = parseInt(s.endTime.split(':')[0], 10);
+        return h > m ? h : m;
+      }, max)
+    , DEFAULT_END_HOUR);
     return last < DEFAULT_END_HOUR ? DEFAULT_END_HOUR : last + 1;
   }, [displayData]);
 
@@ -333,15 +337,19 @@ export default function TimetableScreen() {
                         }}
                       />
                     ))}
-                    {displayData.filter(c => c.dayOfWeek === key).map((cls) => {
+                    {displayData.flatMap(cls =>
+                      cls.schedules
+                        .filter(s => s.dayOfWeek === key)
+                        .map(s => ({ cls, schedule: s }))
+                    ).map(({ cls, schedule }) => {
                       const isDraft = draftCourse?.courseId === cls.courseId;
-                      const { top, height } = getPosition(cls.startTime, cls.endTime);
+                      const { top, height } = getPosition(schedule.startTime, schedule.endTime);
                       const color = isDraft
                         ? { bg: '#F3F4F6', text: '#9CA3AF', border: '#E5E7EB' }
                         : (cls.color && BG_TO_COLOR[cls.color]) ? BG_TO_COLOR[cls.color] : COLOR_PALETTE[0];
                       return (
                         <TouchableOpacity
-                          key={cls.courseId}
+                          key={`${cls.courseId}-${schedule.dayOfWeek}`}
                           onPress={() => { if (!isDraft) setSelectedClass(cls); }}
                           activeOpacity={isDraft ? 1 : 0.8}
                           style={{
@@ -456,8 +464,9 @@ export default function TimetableScreen() {
               <View className="flex-row items-center" style={{ gap: 12 }}>
                 <Clock size={16} color="#9CA3AF" />
                 <Text className="text-sm text-gray-700">
-                  {DAYS.find(d => d.key === selectedClass.dayOfWeek)?.label}요일{' '}
-                  {selectedClass.startTime.substring(0, 5)} - {selectedClass.endTime.substring(0, 5)}
+                  {selectedClass.schedules.map(s =>
+                    `${DAYS.find(d => d.key === s.dayOfWeek)?.label}요일 ${s.startTime.substring(0, 5)}-${s.endTime.substring(0, 5)}`
+                  ).join(' / ')}
                 </Text>
               </View>
               <View className="flex-row items-center" style={{ gap: 12 }}>
@@ -502,8 +511,9 @@ export default function TimetableScreen() {
               <View className="flex-1">
                 <Text className="text-base font-bold text-gray-900">{draftCourse.courseName}</Text>
                 <Text className="text-sm text-gray-400 mt-0.5">
-                  {DAYS.find(d => d.key === draftCourse.dayOfWeek)?.label}요일{' '}
-                  {draftCourse.startTime.substring(0, 5)} - {draftCourse.endTime.substring(0, 5)} · {draftCourse.roomName}
+                  {draftCourse.schedules.map(s =>
+                    `${DAYS.find(d => d.key === s.dayOfWeek)?.label}요일 ${s.startTime.substring(0, 5)}-${s.endTime.substring(0, 5)}`
+                  ).join(' / ')} · {draftCourse.roomName}
                 </Text>
               </View>
             </View>

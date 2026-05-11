@@ -36,14 +36,18 @@ function isDuplicate(cls: Course, existing: Course[]) {
 }
 
 function isTimeOverlap(cls: Course, existing: Course[]) {
-  const clsStart = timeToMinutes(cls.startTime);
-  const clsEnd = timeToMinutes(cls.endTime);
-  return existing.some((e) => {
-    if (e.dayOfWeek !== cls.dayOfWeek) return false;
-    const eStart = timeToMinutes(e.startTime);
-    const eEnd = timeToMinutes(e.endTime);
-    return Math.max(clsStart, eStart) < Math.min(clsEnd, eEnd);
-  });
+  return existing.some((e) =>
+    cls.schedules.some(clsSlot =>
+      e.schedules.some(eSlot => {
+        if (eSlot.dayOfWeek !== clsSlot.dayOfWeek) return false;
+        const clsStart = timeToMinutes(clsSlot.startTime);
+        const clsEnd = timeToMinutes(clsSlot.endTime);
+        const eStart = timeToMinutes(eSlot.startTime);
+        const eEnd = timeToMinutes(eSlot.endTime);
+        return Math.max(clsStart, eStart) < Math.min(clsEnd, eEnd);
+      })
+    )
+  );
 }
 
 export interface CourseSearchModalProps {
@@ -93,7 +97,7 @@ export default function CourseSearchModal({
     };
   }, []);
 
-  const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading } =
+  const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading, isError } =
     useSearchCourses(year, semester, debouncedKeyword);
 
   const allCourses = useMemo(() => {
@@ -149,7 +153,7 @@ export default function CourseSearchModal({
               {item.courseName}
             </Text>
             <Text className="text-xs text-gray-400 mt-0.5" numberOfLines={1}>
-              {DAY_LABELS[item.dayOfWeek]} {item.startTime.substring(0, 5)}-{item.endTime.substring(0, 5)} · {item.roomName}
+              {item.schedules.map(s => `${DAY_LABELS[s.dayOfWeek]} ${s.startTime.substring(0, 5)}-${s.endTime.substring(0, 5)}`).join(' / ')} · {item.roomName}
             </Text>
           </View>
         </View>
@@ -225,6 +229,11 @@ export default function CourseSearchModal({
                   <>
                     <Search size={28} color="#D1D5DB" />
                     <Text className="text-sm text-gray-400 mt-2">강의명을 입력하면 자동으로 검색됩니다</Text>
+                  </>
+                ) : isError ? (
+                  <>
+                    <AlertCircle size={28} color="#FCA5A5" />
+                    <Text className="text-sm text-red-400 mt-2">강의 목록을 불러오지 못했습니다</Text>
                   </>
                 ) : (
                   <>
