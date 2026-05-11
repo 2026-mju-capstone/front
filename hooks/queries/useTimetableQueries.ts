@@ -44,7 +44,7 @@ export const useSearchCourses = (year: number, semester: number, keyword: string
         initialPageParam: 0,
         getNextPageParam: (lastPage) =>
             lastPage.last ? undefined : lastPage.number + 1,
-        enabled: keyword.length >= 2,
+        enabled: true,
         staleTime: 0,
     });
 };

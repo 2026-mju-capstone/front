@@ -196,7 +196,7 @@ export default function CourseSearchModal({
             <Search size={18} color="#9CA3AF" />
             <TextInput
               className="flex-1 ml-2 text-sm text-gray-900"
-              placeholder="강의명 검색 (2글자 이상)"
+              placeholder="강의명 검색"
               placeholderTextColor="#9CA3AF"
               value={keyword}
               onChangeText={setKeyword}
