@@ -3,13 +3,13 @@ import { fonts } from "@/constants/typography";
 import { ROUTES } from "@/constants/url";
 import { useSignup } from "@/hooks/mutations/useAuthMutations";
 import { useCheckNickname } from "@/hooks/queries/useAuthQueries";
+import { useAuthStore } from "@/store/authStore";
 import {
   BottomSheetBackdrop,
   BottomSheetFlatList,
   BottomSheetModal,
   BottomSheetTextInput,
 } from "@gorhom/bottom-sheet";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import {
@@ -119,11 +119,9 @@ export default function ProfilePage() {
         onSuccess: async (result) => {
           if (result.success) {
             if (result.data.access_token) {
-              await AsyncStorage.setItem("token", result.data.access_token);
+              useAuthStore.getState().setToken(result.data.access_token);
             }
-            requestAnimationFrame(() => {
-              router.replace(ROUTES.MAP);
-            });
+            router.replace(ROUTES.MAP);
           } else {
             setErrors({ nickname: result.error || "회원가입에 실패했습니다." });
           }

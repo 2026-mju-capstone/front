@@ -20,7 +20,7 @@ import { useFonts } from "expo-font";
 import { Stack, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import "react-native-reanimated";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -74,8 +74,16 @@ function RootLayoutNav() {
     // 앱 준비 완료 조건:
     // 1. 초기화 완료 AND 2. 폰트 로딩 완료
     // AND (3. 토큰이 없거나 OR 4. 토큰 검증이 끝났거나(로딩 종료))
-    const isAppReady =
-        isInitialized && fontsLoaded && (!token || !isProfileLoading);
+    const [isAppReady, setIsAppReady] = useState(false);
+
+    useEffect(() => {
+        if (!isAppReady) {
+            const ready = isInitialized && fontsLoaded && (!token || !isProfileLoading);
+            if (ready) {
+                setIsAppReady(true);
+            }
+        }
+    }, [isInitialized, fontsLoaded, token, isProfileLoading, isAppReady]);
 
     const colorScheme = useColorScheme();
 
