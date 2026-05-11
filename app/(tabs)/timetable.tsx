@@ -37,17 +37,49 @@ const BG_TO_COLOR: Record<string, ColorSet> =
   Object.fromEntries(COLOR_PALETTE.map(c => [c.bg, c]));
 
 function assignColor(course: Course, allCourses: Course[]): string {
+  const DAYS_ORDER: DayOfWeek[] = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
   const courseDays = new Set(course.schedules.map(s => s.dayOfWeek));
+  
+  // 같은 요일 인접 요일 계산
+  const conflictDays = new Set<DayOfWeek>();
+  for (const day of courseDays) {
+    conflictDays.add(day);
+    const idx = DAYS_ORDER.indexOf(day);
+    if (idx > 0) conflictDays.add(DAYS_ORDER[idx - 1]);
+    if (idx < DAYS_ORDER.length - 1) conflictDays.add(DAYS_ORDER[idx + 1]);
+  }
+
+  // 인접 요일에 사용된 색상들
+  const usedOnConflictDays = new Set(
+    allCourses
+      .filter(c => c.courseId !== course.courseId && c.color &&
+        c.schedules.some(s => conflictDays.has(s.dayOfWeek)))
+      .map(c => c.color!)
+  );
+
+  const availableStrict = COLOR_PALETTE.filter(p => !usedOnConflictDays.has(p.bg));
+  
+  // 1순위: 인접 요일도 안 겹치는 색상 중 '랜덤' 선택
+  if (availableStrict.length > 0) {
+    const randomIndex = Math.floor(Math.random() * availableStrict.length);
+    return availableStrict[randomIndex].bg;
+  }
+
+  // 2순위: 인접 요일은 포기하고, 최소한 같은 요일만이라도 안 겹치는 색상 중 랜덤 선택
   const usedOnSameDay = new Set(
     allCourses
       .filter(c => c.courseId !== course.courseId && c.color &&
         c.schedules.some(s => courseDays.has(s.dayOfWeek)))
       .map(c => c.color!)
   );
-  const available = COLOR_PALETTE.find(p => !usedOnSameDay.has(p.bg));
-  if (available) return available.bg;
+  
+  const availableSame = COLOR_PALETTE.filter(p => !usedOnSameDay.has(p.bg));
+  if (availableSame.length > 0) {
+    const randomIndex = Math.floor(Math.random() * availableSame.length);
+    return availableSame[randomIndex].bg;
+  }
 
-  // 팔레트 초과 시 전체에서 가장 덜 쓰인 색 배정
+  //팔레트 초과 시 전체에서 가장 덜 쓰인 색 배정
   const usage = new Map<string, number>();
   for (const c of allCourses) {
     if (c.color) usage.set(c.color, (usage.get(c.color) ?? 0) + 1);
