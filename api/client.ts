@@ -8,7 +8,7 @@ const axiosInstance = axios.create({
         'Content-Type': 'application/json',
     },
 });
-
+//TODO: 나중에 안정화되면 console.log 지우기
 // Request Interceptor: Add Authorization token
 axiosInstance.interceptors.request.use(
     async (config) => {
@@ -16,9 +16,16 @@ axiosInstance.interceptors.request.use(
         const token = useAuthStore.getState().token;
 
         if (__DEV__) {
-            console.log(`[API Request] ${config.method?.toUpperCase()} ${config.url}`);
+            console.log(
+                `[REQ] ${config.method?.toUpperCase()} ${config.url}`,
+                config.params ? `\n   Params: ${JSON.stringify(config.params)}` : "",
+                config.data ? `\n   Body: ${JSON.stringify(config.data)}` : ""
+            );
         }
         if (token) {
+            if (__DEV__) {
+                console.log(`[AUTH] Token: Bearer ${token}`);
+            }
             config.headers.Authorization = `Bearer ${token}`;
         }
         return config;
@@ -28,7 +35,15 @@ axiosInstance.interceptors.request.use(
 
 // Response Interceptor: Handle token updates or errors
 axiosInstance.interceptors.response.use(
-    (response) => response,
+    (response) => {
+        if (__DEV__) {
+            console.log(
+                `[RES] [${response.status}] ${response.config.method?.toUpperCase()} ${response.config.url}`,
+                `\n   Data:`, response.data
+            );
+        }
+        return response;
+    },
     async (error) => {
         if (__DEV__) {
             console.error(
