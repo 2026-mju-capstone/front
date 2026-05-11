@@ -30,6 +30,13 @@ axiosInstance.interceptors.request.use(
 axiosInstance.interceptors.response.use(
     (response) => response,
     async (error) => {
+        if (__DEV__) {
+            console.error(
+                `[API Error] ${error.config?.method?.toUpperCase()} ${error.config?.url}`,
+                error.response?.status,
+                error.response?.data,
+            );
+        }
         if (error.response?.status === 401) {
             // 401 발생 시 스토어 초기화 (자동 로그아웃 유도)
             useAuthStore.getState().clearToken();

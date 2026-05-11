@@ -22,6 +22,13 @@ export const timetableService = {
                 sort: 'courseName,asc'
             }
         });
+        const page_data = response.data.data;
+        page_data.content = page_data.content.map(c => ({ ...c, schedules: c.schedules ?? [] }));
+        return page_data;
+    },
+
+    getPrimaryTimetable: async () => {
+        const response = await axiosInstance.get<ApiResponse<TimetableSummary>>(`${TIMETABLES_URL}/primary`);
         return response.data.data;
     },
 
@@ -37,7 +44,7 @@ export const timetableService = {
 
     getTimetableDetail: async (id: number) => {
         const response = await axiosInstance.get<ApiResponse<Course[]>>(`${TIMETABLES_URL}/${id}`);
-        return response.data.data;
+        return (response.data.data ?? []).map(c => ({ ...c, schedules: c.schedules ?? [] }));
     },
 
     syncTimetable: async (id: number, data: SyncTimetableRequest) => {
