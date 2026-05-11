@@ -2,7 +2,7 @@ import {
     Book,
     CreditCard,
     Headphones,
-    Package,
+    Package, Smartphone,
     Umbrella,
 } from "lucide-react-native";
 
@@ -23,7 +23,7 @@ export const CATEGORY_MAP: Record<string, string> = {
 };
 
 export const CATEGORY_ICON_MAP: Record<string, any> = {
-    SMARTPHONE: Headphones,
+    SMARTPHONE: Smartphone,
     EARPHONES: Headphones,
     BAG: Package,
     WALLET: CreditCard,
