@@ -1,137 +1,137 @@
 // Generic API Response
 export interface ApiResponse<T> {
-    success: boolean;
-    data: T;
-    error?: string;
+  success: boolean;
+  data: T;
+  error?: string;
 }
 
 // Auth Types
 export interface LoginRequest {
-    schoolEmail: string;
-    password?: string;
+  schoolEmail: string;
+  password?: string;
 }
 
 export interface LoginResponse {
-    accessToken: string;
-    nickname: string;
-    department: string;
-    grade: string;
-    message?: string;
+  accessToken: string;
+  nickname: string;
+  department: string;
+  grade: string;
+  message?: string;
 }
 
 export interface SignupRequest {
-    schoolEmail: string;
-    password?: string;
-    nickname?: string;
-    department?: string;
-    grade?: string;
+  schoolEmail: string;
+  password?: string;
+  nickname?: string;
+  department?: string;
+  grade?: string;
 }
 
 export interface SignupResponse {
-    message: string;
-    user_id: number;
-    access_token: string;
+  message: string;
+  user_id: number;
+  access_token: string;
 }
 
 export interface CertificationRequest {
-    email: string;
+  email: string;
 }
 
 export interface VerifyRequest {
-    email: string;
-    certificationNumber: string;
+  email: string;
+  certificationNumber: string;
 }
 
 export interface CheckNicknameResponse {
-    message: string;
-    available: boolean;
+  message: string;
+  available: boolean;
 }
 
 export interface DeviceTokenRequest {
-    token: string;
+  token: string;
 }
 
 // User Profile Types
 export interface UserProfile {
-    nickname: string;
-    department: string;
-    postCount: number;
-    chatRoomCount: number;
-    unreadCount: number;
+  nickname: string;
+  department: string;
+  postCount: number;
+  chatRoomCount: number;
+  unreadCount: number;
 }
 
 export interface UpdateProfileRequest {
-    nickname: string;
-    department: string;
+  nickname: string;
+  department: string;
 }
 
 // --- Pagination ---
 export interface Pageable {
-    page: number;
-    size: number;
-    sort?: string[];
+  page: number;
+  size: number;
+  sort?: string[];
 }
 
 export interface PageResponse<T> {
-    totalElements: number;
-    totalPages: number;
-    size: number;
-    content: T[];
-    number: number;
-    first: boolean;
-    last: boolean;
-    numberOfElements: number;
-    empty: boolean;
+  totalElements: number;
+  totalPages: number;
+  size: number;
+  content: T[];
+  number: number;
+  first: boolean;
+  last: boolean;
+  numberOfElements: number;
+  empty: boolean;
 }
 
 // --- Timetable & Course ---
-export type DayOfWeek = 'MON' | 'TUE' | 'WED' | 'THU' | 'FRI' | 'SAT' | 'SUN';
+export type DayOfWeek = "MON" | "TUE" | "WED" | "THU" | "FRI" | "SAT" | "SUN";
 
 export interface CourseSchedule {
-    dayOfWeek: DayOfWeek;
-    startTime: string; // HH:mm:ss
-    endTime: string;   // HH:mm:ss
+  dayOfWeek: DayOfWeek;
+  startTime: string; // HH:mm:ss
+  endTime: string; // HH:mm:ss
 }
 
 export interface Course {
-    courseId: number;
-    courseName: string;
-    roomName: string;
-    buildingName: string;
-    buildingCode: string;
-    color?: string;
-    schedules: CourseSchedule[];
+  courseId: number;
+  courseName: string;
+  roomName: string;
+  buildingName: string;
+  buildingCode: string;
+  color?: string;
+  schedules: CourseSchedule[];
 }
 
 export interface TimetableSummary {
-    timetableId: number;
-    name: string;
-    isPrimary: boolean;
-    year: number;
-    semester: number;
+  timetableId: number;
+  name: string;
+  isPrimary: boolean;
+  year: number;
+  semester: number;
 }
 
 export interface SyncCourseRequest {
-    courseId: number;
-    color: string;
+  courseId: number;
+  color: string;
 }
 
 export interface SyncTimetableRequest {
-    courses: SyncCourseRequest[];
+  courses: SyncCourseRequest[];
 }
 
 export interface CreateTimetableRequest {
-    name: string;
-    year: number;
-    semester: number;
+  name: string;
+  year: number;
+  semester: number;
 }
 
 // Image Types
 export type ImagePurpose = "ITEM";
 
 export interface ImageUploadResponse {
-    image_url: string;
-    original_filename: string;
+  image_url: string;
+  original_filename: string;
 }
 
 // Lost Item Types
@@ -139,49 +139,132 @@ export type ItemType = "LOST" | "FOUND";
 export type ItemStatus = "REPORTED" | "RESOLVED"; // Swagger mentions REPORTED
 
 export interface ItemPost {
-    id: number;
-    title: string;
-    description: string;
-    type: ItemType;
-    status: string;
-    category: string;
-    image_url: string;
-    building_id: number;
-    data_address: string;
-    created_at: string;
+  id: number;
+  title: string;
+  description: string;
+  type: ItemType;
+  status: string;
+  category: string;
+  image_url: string;
+  building_id: number;
+  data_address: string;
+  created_at: string;
 }
 
 export interface ItemListResponse {
-    total: number;
-    page: number;
-    item_posts: ItemPost[];
+  total: number;
+  page: number;
+  item_posts: ItemPost[];
 }
 
-export interface ItemDetail extends ItemPost {
-}
+export interface ItemDetail extends ItemPost {}
 
 export interface ItemFilter {
-    status?: string;
-    category?: string;
-    color?: string;
+  status?: string;
+  category?: string;
+  color?: string;
 }
 
 export interface CreateItemRequest {
-    type: ItemType;
-    title: string;
-    description: string;
-    image_url: string;
-    building_id: number;
-    detail_address: string;
-    reported_at: string;
-    // Swagger example doesn't show category/color, but List/Detail do.
-    // Adding them as they are likely needed.
-    category: string;
-    color: string;
+  type: ItemType;
+  title: string;
+  description: string;
+  image_url: string;
+  building_id: number;
+  detail_address: string;
+  reported_at: string;
+  // Swagger example doesn't show category/color, but List/Detail do.
+  // Adding them as they are likely needed.
+  category: string;
+  color: string;
 }
 
 export interface CreateItemResponse {
-    itemId: number;
-    message: string;
-    item_status: string;
+  itemId: number;
+  message: string;
+  item_status: string;
+}
+
+// Chat Types
+export type ChatRoomStatus =
+  | "OPEN"
+  | "RESOLVED_RETURNED"
+  | "RESOLVED_ABANDONED";
+
+export interface ChatRoomRecord {
+  status: ChatRoomStatus;
+  room_id: number;
+  owner_nickname: string;
+  finder_nickname: string;
+  item_name: string;
+}
+
+export interface MessageRecord {
+  message: string;
+  sender_id: number;
+  sender_nickname: string;
+  sent_at: string;
+  read_at: string | null;
+}
+
+export interface ListMessagesResult {
+  messages: MessageRecord[];
+  chat_room: ChatRoomRecord;
+}
+
+export interface CreateChatRoomRequest {
+  item_id: number;
+  counterpart_id: number;
+}
+
+export interface CreateChatRoomResult {
+  created: boolean;
+  room_data: ChatRoomRecord;
+}
+
+export interface ListChatRoomResult {
+  chatRoomIds: number[];
+}
+
+export interface FindChatRoomResult {
+  exists: boolean;
+  room_id: number;
+}
+
+export interface CloseChatRoomRequest {
+  reason: "RETURNED" | "ABANDONED";
+}
+
+export interface MessageFilter {
+  start_time?: string;
+  end_time?: string;
+}
+
+// Matching Types
+export type MatchStatus = "CANDIDATE" | "NOTIFIED" | "CONFIRMED" | "REJECTED";
+
+export interface ItemMatchResultResponse {
+  score: number;
+  status: MatchStatus;
+  match_id: string;
+  found_item_id: number;
+  found_post_id: number;
+  found_post_title: string;
+  found_image_url: string;
+  locationName: string;
+  found_nickname: string;
+  found_department: string;
+}
+
+export interface MatchManualRequest {
+  lost_item_id: number;
+  found_item_id: number;
+}
+
+export type MatchManualType = "LOCKER" | "CHAT";
+
+export interface MatchManualResponse {
+  match_id: number;
+  match_manual_type: MatchManualType;
+  locker_id: number;
 }

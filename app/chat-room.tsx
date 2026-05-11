@@ -1,53 +1,37 @@
-import axiosInstance from "@/api/client";
 import { fonts } from "@/constants/typography";
-import { ROUTES } from "@/constants/url";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useChatMutations } from "@/hooks/mutations/useChatMutations";
+import { useChatQueries } from "@/hooks/queries/useChatQueries";
+import { useProfile } from "@/hooks/queries/useUserQueries";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import {
-    ChevronLeft,
-    ChevronRight,
-    MoreVertical,
-    Package,
-    Plus,
-    Send,
-    User,
+  ChevronLeft,
+  ChevronRight,
+  MoreVertical,
+  Package,
+  Plus,
+  Send,
+  User,
 } from "lucide-react-native";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    KeyboardAvoidingView,
-    Platform,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  FlatList,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-
-type Message = {
-  message: string | null;
-  sender_id: number | null;
-  sender_nickname: string | null;
-  sent_at: string;
-  read_at: string | null;
-};
-
-type ChatRoom = {
-  room_id: number;
-  owner_nickname: string;
-  finder_nickname: string;
-  item_detail: string;
-  item_id?: number;
-};
+import Toast from "react-native-toast-message";
 
 function formatTime(dateStr: string) {
   const d = new Date(dateStr);
-  const h = d.getHours();
-  const hh = String(h).padStart(2, "0");
-  const mm = String(d.getMinutes()).padStart(2, "0");
-  return `${hh}:${mm}`;
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 
 function formatDateLabel(dateStr: string) {
@@ -67,85 +51,117 @@ export default function ChatRoomScreen() {
   const insets = useSafeAreaInsets();
   const { roomId } = useLocalSearchParams<{ roomId: string }>();
   const flatListRef = useRef<FlatList>(null);
+  const roomIdNum = Number(roomId);
 
-  const [chatRoom, setChatRoom] = useState<ChatRoom | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSending, setIsSending] = useState(false);
-  const [isClosed, setIsClosed] = useState(false);
+  const [showCloseModal, setShowCloseModal] = useState(false);
+  const [isFocused, setIsFocused] = useState(true);
+
+  // 화면 포커스 추적 (활성화 시에만 폴링)
+  useFocusEffect(
+    useCallback(() => {
+      setIsFocused(true);
+      return () => setIsFocused(false);
+    }, []),
+  );
+
+  // Hooks
+  const { data: profile } = useProfile();
+  const { data: roomData, isLoading: isRoomLoading } =
+    useChatQueries.useChatRoom(roomIdNum);
+  const { data: messagesData, isLoading: isMessagesLoading } =
+    useChatQueries.useMessages(roomIdNum, isFocused);
+
+  const sendMessageMutation = useChatMutations.useSendMessage(
+    roomIdNum,
+    profile?.nickname,
+  );
+  const closeChatRoomMutation = useChatMutations.useCloseChatRoom(roomIdNum);
+  const reopenChatRoomMutation = useChatMutations.useReopenChatRoom(roomIdNum);
+
+  const chatRoom = roomData?.success ? roomData.data : null;
+  const messages = messagesData?.success ? messagesData.data.messages : [];
+  const isClosed = chatRoom?.status !== "OPEN";
+  const isLoading = isRoomLoading || isMessagesLoading;
 
   useEffect(() => {
-    fetchChatRoom();
-    fetchMessages();
-    const interval = setInterval(fetchMessages, 5000);
-    return () => clearInterval(interval);
-  }, [roomId]);
-
-  const fetchChatRoom = async () => {
-    try {
-      const res = await axiosInstance.get(`/api/chat-rooms/${roomId}`);
-      if (res.data.success && res.data.data) {
-        setChatRoom(res.data.data);
-      }
-    } catch (e) {
-      console.error("채팅방 조회 실패", e);
+    if (messages.length > 0) {
+      flatListRef.current?.scrollToEnd({ animated: false });
     }
-  };
-
-  const fetchMessages = async () => {
-    try {
-      const res = await axiosInstance.get(`/api/chat-rooms/${roomId}/messages`);
-      if (res.data.success && res.data.data?.messages) {
-        setMessages(res.data.data.messages);
-      }
-    } catch (e) {
-      console.error("메시지 조회 실패", e);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  }, [messages]);
 
   const sendMessage = async () => {
-    if (!inputText.trim() || isSending) return;
-    setIsSending(true);
+    if (!inputText.trim() || sendMessageMutation.isPending) return;
     const text = inputText.trim();
     setInputText("");
-    try {
-      const response = await axiosInstance.post(
-        `/api/chat-rooms/${roomId}/messages/send`,
-        { message: text },
-      );
-
-      if (response.data.success) {
-        await fetchMessages();
-        flatListRef.current?.scrollToEnd({ animated: true });
-      } else {
-        Alert.alert("전송 실패", "메시지를 전송하지 못했어요.");
+    sendMessageMutation.mutate(text, {
+      onError: () => {
+        Toast.show({
+          type: "error",
+          text1: "메시지 전송 실패",
+          text2: "잠시 후 다시 시도해주세요.",
+          position: "bottom",
+          visibilityTime: 2500,
+        });
         setInputText(text);
-      }
-    } catch (error) {
-      console.error("메시지 전송 에러:", error);
-      Alert.alert("오류", "네트워크 오류가 발생했어요.");
-      setInputText(text);
-    } finally {
-      setIsSending(false);
-    }
+      },
+      onSuccess: () => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      },
+    });
   };
 
-  const handleComplete = () => {
-    Alert.alert(
-      "회수 완료",
-      "정말 회수가 완료되셨나요?\n종료 후에는 복구할 수 없습니다.",
-      [
-        { text: "취소", style: "cancel" },
-        { text: "완료", onPress: () => setIsClosed(true) },
-      ],
-    );
+  const handleClose = (reason: "RETURNED" | "ABANDONED") => {
+    setShowCloseModal(false);
+    closeChatRoomMutation.mutate(reason, {
+      onSuccess: () => {
+        Toast.show({
+          type: "success",
+          text1:
+            reason === "RETURNED"
+              ? "반환 완료 처리되었어요"
+              : "거래가 종료되었어요",
+          position: "bottom",
+          visibilityTime: 2500,
+        });
+      },
+      onError: () => {
+        Toast.show({
+          type: "error",
+          text1: "거래 종료 실패",
+          text2: "다시 시도해주세요.",
+          position: "bottom",
+          visibilityTime: 2500,
+        });
+      },
+    });
   };
 
-  // 날짜 구분선 삽입을 위한 데이터 가공
-  type MessageItem = Message | { type: "date"; label: string; key: string };
+  const handleReopen = () => {
+    reopenChatRoomMutation.mutate(undefined, {
+      onSuccess: () => {
+        Toast.show({
+          type: "success",
+          text1: "채팅방이 재개되었어요",
+          position: "bottom",
+          visibilityTime: 2500,
+        });
+      },
+      onError: () => {
+        Toast.show({
+          type: "error",
+          text1: "채팅방 재개 실패",
+          text2: "다시 시도해주세요.",
+          position: "bottom",
+          visibilityTime: 2500,
+        });
+      },
+    });
+  };
+
+  // 날짜 구분선 삽입
+  type DateItem = { type: "date"; label: string; key: string };
+  type MessageItem = (typeof messages)[0] | DateItem;
 
   const messagesWithDates: MessageItem[] = [];
   let lastDate = "";
@@ -189,15 +205,22 @@ export default function ChatRoomScreen() {
           <Text style={styles.headerTitle} numberOfLines={1}>
             {chatRoom?.owner_nickname ?? "채팅"}
           </Text>
-          {chatRoom?.item_detail ? (
+          {chatRoom?.item_name ? (
             <Text style={styles.headerSub} numberOfLines={1}>
-              {chatRoom.item_detail}
+              {chatRoom.item_name}
             </Text>
           ) : null}
         </View>
-        {!isClosed && (
-          <TouchableOpacity style={styles.completeBtn} onPress={handleComplete}>
-            <Text style={styles.completeBtnText}>회수 완료</Text>
+        {!isClosed ? (
+          <TouchableOpacity
+            style={styles.completeBtn}
+            onPress={() => setShowCloseModal(true)}
+          >
+            <Text style={styles.completeBtnText}>거래 완료</Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity style={styles.reopenBtn} onPress={handleReopen}>
+            <Text style={styles.reopenBtnText}>재개</Text>
           </TouchableOpacity>
         )}
         <TouchableOpacity style={styles.moreBtn}>
@@ -207,31 +230,24 @@ export default function ChatRoomScreen() {
 
       {/* 분실물 배너 */}
       {chatRoom && (
-        <TouchableOpacity
-          style={styles.itemBanner}
-          onPress={() => {
-            if (chatRoom.item_id) {
-              router.push({
-                pathname: ROUTES.LOST_ITEM_DETAIL,
-                params: { id: chatRoom.item_id },
-              });
-            }
-          }}
-          activeOpacity={0.7}
-        >
+        <View style={styles.itemBanner}>
           <View style={styles.itemBannerIcon}>
             <Package size={16} color="#6366f1" />
           </View>
           <Text style={styles.itemBannerText} numberOfLines={1}>
-            {chatRoom.item_detail}
+            {chatRoom.item_name}
           </Text>
           <ChevronRight size={14} color="#aaa" />
-        </TouchableOpacity>
+        </View>
       )}
 
       {isClosed && (
         <View style={styles.closedBanner}>
-          <Text style={styles.closedText}>종료된 거래입니다</Text>
+          <Text style={styles.closedText}>
+            {chatRoom?.status === "RESOLVED_RETURNED"
+              ? "반환 완료된 거래입니다"
+              : "종료된 거래입니다"}
+          </Text>
         </View>
       )}
 
@@ -256,7 +272,6 @@ export default function ChatRoomScreen() {
             </View>
           }
           renderItem={({ item }) => {
-            // 날짜 구분선
             if ("type" in item && item.type === "date") {
               return (
                 <View style={styles.dateLabelWrap}>
@@ -264,10 +279,7 @@ export default function ChatRoomScreen() {
                 </View>
               );
             }
-
-            const msg = item as Message;
-
-            // 시스템 메시지
+            const msg = item as (typeof messages)[0];
             if (msg.sender_id === null) {
               return (
                 <View style={styles.systemMsgWrap}>
@@ -275,9 +287,7 @@ export default function ChatRoomScreen() {
                 </View>
               );
             }
-
-            const isMine = msg.sender_nickname === chatRoom?.finder_nickname;
-
+            const isMine = msg.sender_nickname === profile?.nickname;
             return (
               <View style={[styles.msgRow, isMine && styles.msgRowMine]}>
                 {!isMine && (
@@ -327,16 +337,46 @@ export default function ChatRoomScreen() {
               (!inputText.trim() || isClosed) && styles.sendBtnDisabled,
             ]}
             onPress={sendMessage}
-            disabled={!inputText.trim() || isClosed || isSending}
+            disabled={!inputText.trim() || isClosed}
           >
-            {isSending ? (
-              <ActivityIndicator size="small" color="#fff" />
-            ) : (
-              <Send size={18} color="#fff" />
-            )}
+            <Send size={18} color="#fff" />
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
+
+      {/* 거래 완료 모달 */}
+      <Modal visible={showCloseModal} transparent animationType="fade">
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setShowCloseModal(false)}
+        />
+        <View style={styles.modalWrap}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>거래 종료</Text>
+            <Text style={styles.modalDesc}>거래를 어떻게 종료할까요?</Text>
+            <TouchableOpacity
+              style={styles.modalBtn}
+              onPress={() => handleClose("RETURNED")}
+            >
+              <Text style={styles.modalBtnText}>✅ 물건을 돌려받았어요</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.modalBtn, styles.modalBtnGray]}
+              onPress={() => handleClose("ABANDONED")}
+            >
+              <Text style={[styles.modalBtnText, styles.modalBtnTextGray]}>
+                거래를 포기할게요
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.cancelBtn}
+              onPress={() => setShowCloseModal(false)}
+            >
+              <Text style={styles.cancelBtnText}>취소</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -384,6 +424,13 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   completeBtnText: { fontSize: 13, fontFamily: fonts.bold, color: "#6366f1" },
+  reopenBtn: {
+    backgroundColor: "#f5f6f8",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  reopenBtnText: { fontSize: 13, fontFamily: fonts.bold, color: "#888" },
   moreBtn: {
     width: 32,
     height: 32,
@@ -530,4 +577,45 @@ const styles = StyleSheet.create({
     fontFamily: fonts.regular,
     color: "#555",
   },
+  modalOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.4)",
+  },
+  modalWrap: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 32,
+  },
+  modalCard: {
+    width: "100%",
+    backgroundColor: "#fff",
+    borderRadius: 20,
+    padding: 24,
+    gap: 12,
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  modalTitle: { fontSize: 18, fontFamily: fonts.bold, color: "#111" },
+  modalDesc: { fontSize: 14, fontFamily: fonts.regular, color: "#666" },
+  modalBtn: {
+    backgroundColor: "#eef2ff",
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: "center",
+  },
+  modalBtnGray: { backgroundColor: "#f5f6f8" },
+  modalBtnText: { fontSize: 14, fontFamily: fonts.bold, color: "#6366f1" },
+  modalBtnTextGray: { color: "#888" },
+  cancelBtn: {
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+  cancelBtnText: { fontSize: 14, fontFamily: fonts.regular, color: "#aaa" },
 });

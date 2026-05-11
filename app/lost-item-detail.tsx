@@ -1,40 +1,40 @@
 import { BASE_BUILDINGS } from "@/constants/buildings";
 import {
-    CATEGORY_ICON_MAP,
-    CATEGORY_MAP,
-    ITEM_STATUS_STYLE,
-    ITEM_TYPE_MAP,
+  CATEGORY_ICON_MAP,
+  CATEGORY_MAP,
+  ITEM_STATUS_STYLE,
+  ITEM_TYPE_MAP,
 } from "@/constants/categories";
 import { fonts } from "@/constants/typography";
 import { BASE_URL, ROUTES } from "@/constants/url";
 import { useItemQueries } from "@/hooks/queries/useItemQueries";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
-    ChevronLeft,
-    MapPin,
-    MessageCircle,
-    Package,
-    Share2,
-    X,
+  ChevronLeft,
+  MapPin,
+  MessageCircle,
+  Package,
+  Share2,
+  X,
 } from "lucide-react-native";
 import { useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Dimensions,
-    Image,
-    Modal,
-    ScrollView,
-    Share,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Dimensions,
+  Image,
+  Modal,
+  ScrollView,
+  Share,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { WebView } from "react-native-webview";
 
-const KAKAO_API_KEY = "7488059674373cdf0eb9299fef1ec2ec";
+const KAKAO_API_KEY = process.env.EXPO_PUBLIC_KAKAO_MAP_KEY!;
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 function formatDateTime(dateStr: string) {

@@ -243,9 +243,6 @@ export default function LoginPage() {
           </View>
 
           <View style={styles.linkRow}>
-            <TouchableOpacity>
-              <Text style={styles.linkText}>아이디/비밀번호 찾기</Text>
-            </TouchableOpacity>
             <TouchableOpacity onPress={() => router.push(ROUTES.SIGNUP)}>
               <Text style={styles.linkTextBold}>회원가입</Text>
             </TouchableOpacity>
@@ -342,7 +339,10 @@ const styles = StyleSheet.create({
     color: "#fff",
   },
   loginButtonTextInactive: { color: "#aaa" },
-  linkRow: { flexDirection: "row", justifyContent: "space-between" },
+  linkRow: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+  },
   linkText: { fontSize: 13, color: "#aaa", fontFamily: fonts.regular },
   linkTextBold: { fontSize: 13, color: "#6366f1", fontFamily: fonts.bold },
   termsRow: {

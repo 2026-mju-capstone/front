@@ -25,7 +25,14 @@ export const TIMETABLES_URL = BASE_URL + "/api/timetables";
 export const COURSES_URL = BASE_URL + "/api/courses";
 
 // Chat
-export const CHAT_ROOM_URL = BASE_URL + "/api/chat/room";
+export const CHAT_ROOM_URL = BASE_URL + "/api/chat-rooms";
+
+// Matching
+export const MATCHES_URL = BASE_URL + "/api/matches";
+
+// Metadata
+export const BUILDINGS_URL = BASE_URL + "/api/metadata/buildings";
+export const ITEM_CATEGORIES_URL = BASE_URL + "/api/metadata/item-categories";
 
 // Images
 export const IMAGE_UPLOAD_URL = BASE_URL + "/api/images/upload";
