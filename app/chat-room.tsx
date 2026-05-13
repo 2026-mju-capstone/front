@@ -1,8 +1,14 @@
+import { ApiResponse, ListMessagesResult, MessageRecord } from "@/api/types";
 import { fonts } from "@/constants/typography";
 import { useChatMutations } from "@/hooks/mutations/useChatMutations";
-import { useChatQueries } from "@/hooks/queries/useChatQueries";
+import {
+  CHAT_QUERY_KEYS,
+  useChatQueries,
+} from "@/hooks/queries/useChatQueries";
 import { useProfile } from "@/hooks/queries/useUserQueries";
-import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
+import { useChatSocket } from "@/hooks/useChatSocket";
+import { useQueryClient } from "@tanstack/react-query";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import {
   ChevronLeft,
   ChevronRight,
@@ -12,7 +18,7 @@ import {
   Send,
   User,
 } from "lucide-react-native";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -52,25 +58,21 @@ export default function ChatRoomScreen() {
   const { roomId } = useLocalSearchParams<{ roomId: string }>();
   const flatListRef = useRef<FlatList>(null);
   const roomIdNum = Number(roomId);
+  const queryClient = useQueryClient();
 
   const [inputText, setInputText] = useState("");
   const [showCloseModal, setShowCloseModal] = useState(false);
-  const [isFocused, setIsFocused] = useState(true);
-
-  // 화면 포커스 추적 (활성화 시에만 폴링)
-  useFocusEffect(
-    useCallback(() => {
-      setIsFocused(true);
-      return () => setIsFocused(false);
-    }, []),
-  );
 
   // Hooks
   const { data: profile } = useProfile();
   const { data: roomData, isLoading: isRoomLoading } =
     useChatQueries.useChatRoom(roomIdNum);
   const { data: messagesData, isLoading: isMessagesLoading } =
-    useChatQueries.useMessages(roomIdNum, isFocused);
+    useChatQueries.useMessages(roomIdNum, false); // WebSocket 사용 시 폴링 OFF
+
+  // WebSocket 연결
+  const { sendMessage: wsSendMessage, isConnected: wsConnected } =
+    useChatSocket(roomIdNum, true);
 
   const sendMessageMutation = useChatMutations.useSendMessage(
     roomIdNum,
@@ -91,24 +93,54 @@ export default function ChatRoomScreen() {
   }, [messages]);
 
   const sendMessage = async () => {
-    if (!inputText.trim() || sendMessageMutation.isPending) return;
+    if (!inputText.trim()) return;
     const text = inputText.trim();
     setInputText("");
-    sendMessageMutation.mutate(text, {
-      onError: () => {
-        Toast.show({
-          type: "error",
-          text1: "메시지 전송 실패",
-          text2: "잠시 후 다시 시도해주세요.",
-          position: "bottom",
-          visibilityTime: 2500,
-        });
-        setInputText(text);
-      },
-      onSuccess: () => {
-        flatListRef.current?.scrollToEnd({ animated: true });
-      },
-    });
+
+    if (wsConnected) {
+      // WebSocket으로 전송
+      wsSendMessage(text);
+
+      // Optimistic Update (내 메시지 즉시 표시)
+      queryClient.setQueryData<ApiResponse<ListMessagesResult>>(
+        CHAT_QUERY_KEYS.messages(roomIdNum),
+        (old) => {
+          if (!old?.data) return old;
+          const optimistic: MessageRecord = {
+            message: text,
+            sender_id: -1,
+            sender_nickname: profile?.nickname ?? "나",
+            sent_at: new Date().toISOString(),
+            read_at: null,
+          };
+          return {
+            ...old,
+            data: {
+              ...old.data,
+              messages: [...old.data.messages, optimistic],
+            },
+          };
+        },
+      );
+      flatListRef.current?.scrollToEnd({ animated: true });
+    } else {
+      // WebSocket 연결 안 됐을 때 HTTP 폴백
+      sendMessageMutation.mutate(text, {
+        onError: () => {
+          Toast.show({
+            type: "error",
+            text1: "메시지 전송 실패",
+            text2: "잠시 후 다시 시도해주세요.",
+            position: "bottom",
+            visibilityTime: 2500,
+          });
+          setInputText(text);
+        },
+        onSuccess: () => {
+          flatListRef.current?.scrollToEnd({ animated: true });
+        },
+      });
+    }
   };
 
   const handleClose = (reason: "RETURNED" | "ABANDONED") => {
@@ -211,6 +243,15 @@ export default function ChatRoomScreen() {
             </Text>
           ) : null}
         </View>
+        {/* WebSocket 연결 상태 표시 (개발용) */}
+        {__DEV__ && (
+          <View
+            style={[
+              styles.wsIndicator,
+              { backgroundColor: wsConnected ? "#22c55e" : "#f87171" },
+            ]}
+          />
+        )}
         {!isClosed ? (
           <TouchableOpacity
             style={styles.completeBtn}
@@ -305,9 +346,17 @@ export default function ChatRoomScreen() {
                       {msg.message}
                     </Text>
                   </View>
-                  <Text style={[styles.msgTime, isMine && styles.msgTimeMine]}>
-                    {formatTime(msg.sent_at)}
-                  </Text>
+                  <View style={styles.msgMeta}>
+                    {/* 읽음 표시 */}
+                    {isMine && !msg.read_at && (
+                      <Text style={styles.unreadMark}>1</Text>
+                    )}
+                    <Text
+                      style={[styles.msgTime, isMine && styles.msgTimeMine]}
+                    >
+                      {formatTime(msg.sent_at)}
+                    </Text>
+                  </View>
                 </View>
               </View>
             );
@@ -417,6 +466,11 @@ const styles = StyleSheet.create({
     color: "#aaa",
     marginTop: 1,
   },
+  wsIndicator: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
   completeBtn: {
     backgroundColor: "#eef2ff",
     paddingHorizontal: 12,
@@ -492,13 +546,23 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   msgTextMine: { color: "#fff" },
+  msgMeta: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    justifyContent: "flex-end",
+  },
+  unreadMark: {
+    fontSize: 10,
+    fontFamily: fonts.bold,
+    color: "#6366f1",
+  },
   msgTime: {
     fontSize: 10,
     fontFamily: fonts.regular,
     color: "#bbb",
-    marginLeft: 4,
   },
-  msgTimeMine: { textAlign: "right", marginRight: 4 },
+  msgTimeMine: { textAlign: "right" },
   systemMsgWrap: { alignItems: "center", paddingVertical: 4 },
   systemMsg: {
     fontSize: 12,

@@ -1,42 +1,64 @@
 import { ApiResponse, ListMessagesResult, MessageRecord } from "@/api/types";
-import { stompClient } from "@/api/websocket/stompClient";
 import { useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef } from "react";
+import { useFocusEffect } from "expo-router";
+import { useCallback, useEffect, useRef } from "react";
+import { chatSocket } from "../api/websocket/chatSocket";
 import { CHAT_QUERY_KEYS } from "./queries/useChatQueries";
+import { useProfile } from "./queries/useUserQueries";
 
 /**
- * 채팅방 WebSocket 구독 훅
- *
- * ⚠️ 백엔드 WebSocket 미구현으로 현재 비활성화 상태.
- * 백엔드 준비 후 enabled=true 로 활성화하면 됨.
- *
- * @param roomId 채팅방 ID
- * @param enabled WebSocket 활성화 여부 (기본 false - 폴링 사용)
+ * 채팅방 WebSocket 훅
+ * - 포커스 있을 때만 READ 전송
+ * - 백그라운드/다른 화면이면 READ 전송 안 함
  */
-export function useChatSocket(roomId: number, enabled: boolean = false) {
+export function useChatSocket(roomId: number, enabled: boolean = true) {
   const queryClient = useQueryClient();
-  const isSubscribedRef = useRef(false);
+  const { data: profile } = useProfile();
+  const isFocusedRef = useRef(false);
+  const pendingReadRef = useRef(false);
+
+  // 포커스 추적
+  useFocusEffect(
+    useCallback(() => {
+      isFocusedRef.current = true;
+
+      // 포커스 복귀 시 밀린 READ 전송
+      if (pendingReadRef.current && chatSocket.isConnected()) {
+        chatSocket.sendRead(roomId);
+        pendingReadRef.current = false;
+      }
+
+      return () => {
+        isFocusedRef.current = false;
+      };
+    }, [roomId]),
+  );
 
   useEffect(() => {
     if (!enabled || !roomId) return;
 
-    // 연결 시도
-    stompClient.connect(
-      () => {
-        // 연결 성공 후 채팅방 구독
-        stompClient.subscribeToRoom(roomId, (newMessage: MessageRecord) => {
-          // 새 메시지 수신 시 React Query 캐시 업데이트
+    chatSocket.connect(
+      roomId,
+      (msg) => {
+        if (msg.type === "MESSAGE") {
+          const { sender_nickname, message } = msg.payload;
+
           queryClient.setQueryData<ApiResponse<ListMessagesResult>>(
             CHAT_QUERY_KEYS.messages(roomId),
             (old) => {
               if (!old?.data) return old;
-              // 중복 메시지 방지 (같은 sent_at + sender_id 체크)
-              const exists = old.data.messages.some(
-                (m) =>
-                  m.sent_at === newMessage.sent_at &&
-                  m.sender_id === newMessage.sender_id,
-              );
-              if (exists) return old;
+
+              const isMine = sender_nickname === profile?.nickname;
+              if (isMine) return old; // 내 메시지는 Optimistic이 처리
+
+              const newMessage: MessageRecord = {
+                message,
+                sender_id: -1,
+                sender_nickname,
+                sent_at: new Date().toISOString(),
+                read_at: null,
+              };
+
               return {
                 ...old,
                 data: {
@@ -46,24 +68,47 @@ export function useChatSocket(roomId: number, enabled: boolean = false) {
               };
             },
           );
-        });
-        isSubscribedRef.current = true;
+
+          // 포커스 있으면 즉시 READ, 없으면 pending
+          if (isFocusedRef.current) {
+            chatSocket.sendRead(roomId);
+          } else {
+            pendingReadRef.current = true;
+          }
+        }
+
+        if (msg.type === "READ") {
+          // 상대방이 읽었을 때 → 메시지 read_at 업데이트
+          queryClient.setQueryData<ApiResponse<ListMessagesResult>>(
+            CHAT_QUERY_KEYS.messages(roomId),
+            (old) => {
+              if (!old?.data) return old;
+              return {
+                ...old,
+                data: {
+                  ...old.data,
+                  messages: old.data.messages.map((m) =>
+                    m.read_at ? m : { ...m, read_at: new Date().toISOString() },
+                  ),
+                },
+              };
+            },
+          );
+        }
       },
-      (err) => {
-        console.error("[useChatSocket] 연결 실패", err);
+      (errorReason) => {
+        console.error("[useChatSocket] 에러:", errorReason);
       },
     );
 
     return () => {
-      if (isSubscribedRef.current) {
-        stompClient.unsubscribeFromRoom(roomId);
-        isSubscribedRef.current = false;
-      }
+      chatSocket.disconnect();
     };
-  }, [roomId, enabled, queryClient]);
+  }, [roomId, enabled]);
 
   return {
-    sendMessage: (message: string) => stompClient.sendMessage(roomId, message),
-    isConnected: stompClient.isConnected(),
+    sendMessage: (message: string) => chatSocket.sendMessage(roomId, message),
+    sendRead: () => chatSocket.sendRead(roomId),
+    isConnected: chatSocket.isConnected(),
   };
 }
