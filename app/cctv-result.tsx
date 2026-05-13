@@ -6,7 +6,6 @@ import {
   CheckCircle2,
   ChevronLeft,
   Clock,
-  HelpCircle,
   MapPin,
   Sparkles,
   Video,
@@ -144,16 +143,6 @@ export default function CctvResultScreen() {
         status === "CONFIRMED_SELF"
           ? "내 물건으로 확정했어요"
           : "내 물건이 아닌 것으로 표시했어요",
-      position: "bottom",
-      visibilityTime: 2000,
-    });
-  };
-
-  const handleUnsure = () => {
-    Toast.show({
-      type: "info",
-      text1: "잠시 보류했어요",
-      text2: "나중에 다시 확인할 수 있어요",
       position: "bottom",
       visibilityTime: 2000,
     });
@@ -339,14 +328,6 @@ export default function CctvResultScreen() {
                         >
                           <XCircle size={14} color="#888" />
                           <Text style={styles.rejectBtnText}>아니에요</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={styles.unsureBtn}
-                          onPress={handleUnsure}
-                          activeOpacity={0.85}
-                        >
-                          <HelpCircle size={14} color="#6366f1" />
-                          <Text style={styles.unsureBtnText}>모르겠어요</Text>
                         </TouchableOpacity>
                         <TouchableOpacity
                           style={styles.confirmBtn}
@@ -596,17 +577,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#f5f6f8",
   },
   rejectBtnText: { fontSize: 12, fontFamily: fonts.bold, color: "#888" },
-  unsureBtn: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 4,
-    paddingVertical: 12,
-    borderRadius: 12,
-    backgroundColor: "#eef2ff",
-  },
-  unsureBtnText: { fontSize: 12, fontFamily: fonts.bold, color: "#6366f1" },
   confirmBtn: {
     flex: 1.2,
     flexDirection: "row",
