@@ -67,6 +67,7 @@ export default function LostItemDetail() {
   const handleChatPress = useCallback(() => {
     if (!item) return;
 
+    console.log("reporter_id:", item.reporter_id); // 추가!
     console.log("=== 채팅 생성 테스트 시작 ===");
     console.log("아이템 ID:", item.id);
 
@@ -74,9 +75,9 @@ export default function LostItemDetail() {
       {
         item_id: item.id,
         // 테스트를 위해 에뮬레이터 계정 ID를 1로 가정하고 하드코딩합니다.
-        counterpart_id: 1,
+        //counterpart_id: 1,
         // reporter_id 추가되면
-        //counterpart_id: item.reporter_id,
+        counterpart_id: item.reporter_id ?? 0,
       },
       {
         onSuccess: (res) => {
