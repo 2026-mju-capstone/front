@@ -96,24 +96,32 @@ export default function LostItemBoard() {
   }, [data]);
 
   const filtered = useMemo(() => {
-    return items.filter((item) => {
-      const korCategory = CATEGORY_MAP[item.category] ?? "기타";
-      const buildingName =
-        BASE_BUILDINGS.find((b) => b.id === item.building_id)?.name ?? "";
-      const matchType =
-        typeFilter === "전체" ||
-        (typeFilter === "찾는중" && item.type === "LOST") ||
-        (typeFilter === "발견됨" && item.type === "FOUND");
-      const matchCategory =
-        category === "전체" || CATEGORY_TO_API[category] === item.category;
-      const matchSearch =
-        searchQuery === "" ||
-        item.title?.includes(searchQuery) ||
-        korCategory.includes(searchQuery) ||
-        buildingName.includes(searchQuery) ||
-        item.data_address?.includes(searchQuery);
-      return matchType && matchCategory && matchSearch;
-    });
+    return (
+      items
+        .filter((item) => {
+          const korCategory = CATEGORY_MAP[item.category] ?? "기타";
+          const buildingName =
+            BASE_BUILDINGS.find((b) => b.id === item.building_id)?.name ?? "";
+          const matchType =
+            typeFilter === "전체" ||
+            (typeFilter === "찾는중" && item.type === "LOST") ||
+            (typeFilter === "발견됨" && item.type === "FOUND");
+          const matchCategory =
+            category === "전체" || CATEGORY_TO_API[category] === item.category;
+          const matchSearch =
+            searchQuery === "" ||
+            item.title?.includes(searchQuery) ||
+            korCategory.includes(searchQuery) ||
+            buildingName.includes(searchQuery) ||
+            item.data_address?.includes(searchQuery);
+          return matchType && matchCategory && matchSearch;
+        })
+        // 최신순 정렬 추가
+        .sort(
+          (a, b) =>
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+        )
+    );
   }, [items, typeFilter, category, searchQuery]);
 
   const closeDropdowns = () => {
