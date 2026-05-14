@@ -1,28 +1,43 @@
 import { ApiResponse, ListMessagesResult, MessageRecord } from "@/api/types";
 import { useQueryClient } from "@tanstack/react-query";
 import { useFocusEffect } from "expo-router";
-import { useCallback, useEffect, useRef } from "react";
-import { chatSocket } from "../api/websocket/chatSocket";
+import { useCallback, useEffect, useRef, useState } from "react";
+import Toast from "react-native-toast-message";
+import { chatSocket, ConnectionStatus } from "../api/websocket/chatSocket";
 import { CHAT_QUERY_KEYS } from "./queries/useChatQueries";
 import { useProfile } from "./queries/useUserQueries";
 
-/**
- * 채팅방 WebSocket 훅
- * - 포커스 있을 때만 READ 전송
- * - 백그라운드/다른 화면이면 READ 전송 안 함
- */
+// 에러 reason → 사용자 친화적 메시지
+const ERROR_MESSAGES: Record<string, { title: string; subtitle: string }> = {
+  NOT_FOUND: {
+    title: "채팅방을 찾을 수 없어요",
+    subtitle: "삭제되었거나 권한이 없을 수 있어요.",
+  },
+  NOT_PERMITTED: {
+    title: "권한이 없어요",
+    subtitle: "이 채팅방에 참여할 수 없어요.",
+  },
+  BAD_REQUEST: {
+    title: "잘못된 요청이에요",
+    subtitle: "잠시 후 다시 시도해주세요.",
+  },
+  INTERNAL_SERVER_ERROR: {
+    title: "서버 오류가 발생했어요",
+    subtitle: "잠시 후 다시 시도해주세요.",
+  },
+};
+
 export function useChatSocket(roomId: number, enabled: boolean = true) {
   const queryClient = useQueryClient();
   const { data: profile } = useProfile();
   const isFocusedRef = useRef(false);
   const pendingReadRef = useRef(false);
+  const [status, setStatus] = useState<ConnectionStatus>("DISCONNECTED");
 
-  // 포커스 추적
   useFocusEffect(
     useCallback(() => {
       isFocusedRef.current = true;
 
-      // 포커스 복귀 시 밀린 READ 전송
       if (pendingReadRef.current && chatSocket.isConnected()) {
         chatSocket.sendRead(roomId);
         pendingReadRef.current = false;
@@ -39,6 +54,7 @@ export function useChatSocket(roomId: number, enabled: boolean = true) {
 
     chatSocket.connect(
       roomId,
+      // onMessage
       (msg) => {
         if (msg.type === "MESSAGE") {
           const { sender_nickname, message } = msg.payload;
@@ -49,7 +65,7 @@ export function useChatSocket(roomId: number, enabled: boolean = true) {
               if (!old?.data) return old;
 
               const isMine = sender_nickname === profile?.nickname;
-              if (isMine) return old; // 내 메시지는 Optimistic이 처리
+              if (isMine) return old;
 
               const newMessage: MessageRecord = {
                 message,
@@ -69,7 +85,6 @@ export function useChatSocket(roomId: number, enabled: boolean = true) {
             },
           );
 
-          // 포커스 있으면 즉시 READ, 없으면 pending
           if (isFocusedRef.current) {
             chatSocket.sendRead(roomId);
           } else {
@@ -78,7 +93,6 @@ export function useChatSocket(roomId: number, enabled: boolean = true) {
         }
 
         if (msg.type === "READ") {
-          // 상대방이 읽었을 때 → 메시지 read_at 업데이트
           queryClient.setQueryData<ApiResponse<ListMessagesResult>>(
             CHAT_QUERY_KEYS.messages(roomId),
             (old) => {
@@ -96,8 +110,23 @@ export function useChatSocket(roomId: number, enabled: boolean = true) {
           );
         }
       },
-      (errorReason) => {
-        console.error("[useChatSocket] 에러:", errorReason);
+      // onStatus
+      (newStatus) => {
+        setStatus(newStatus);
+      },
+      // onError
+      (reason, message) => {
+        const errorInfo = ERROR_MESSAGES[reason] ?? {
+          title: "오류가 발생했어요",
+          subtitle: message,
+        };
+        Toast.show({
+          type: "error",
+          text1: errorInfo.title,
+          text2: errorInfo.subtitle,
+          position: "bottom",
+          visibilityTime: 3000,
+        });
       },
     );
 
@@ -109,6 +138,8 @@ export function useChatSocket(roomId: number, enabled: boolean = true) {
   return {
     sendMessage: (message: string) => chatSocket.sendMessage(roomId, message),
     sendRead: () => chatSocket.sendRead(roomId),
+    reconnect: () => chatSocket.manualReconnect(),
     isConnected: chatSocket.isConnected(),
+    status,
   };
 }

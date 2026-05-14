@@ -1,37 +1,37 @@
 import { BASE_BUILDINGS } from "@/constants/buildings";
 import {
-    CATEGORY_ICON_MAP,
-    CATEGORY_MAP,
-    CATEGORY_TO_API,
-    ITEM_STATUS_STYLE,
-    ITEM_TYPE_MAP,
+  CATEGORY_ICON_MAP,
+  CATEGORY_MAP,
+  CATEGORY_TO_API,
+  ITEM_STATUS_STYLE,
+  ITEM_TYPE_MAP,
 } from "@/constants/categories";
 import { fonts } from "@/constants/typography";
 import { BASE_URL, ROUTES } from "@/constants/url";
 import { useItemQueries } from "@/hooks/queries/useItemQueries";
 import { useRouter } from "expo-router";
 import {
-    Bell,
-    ChevronDown,
-    MapPin,
-    Package,
-    Plus,
-    Search,
-    User,
-    X,
+  Bell,
+  ChevronDown,
+  MapPin,
+  Package,
+  Plus,
+  Search,
+  User,
+  X,
 } from "lucide-react-native";
 import { useMemo, useState } from "react";
 import {
-    ActivityIndicator,
-    FlatList,
-    Image,
-    RefreshControl,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    TouchableWithoutFeedback,
-    View,
+  ActivityIndicator,
+  FlatList,
+  Image,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  TouchableWithoutFeedback,
+  View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 

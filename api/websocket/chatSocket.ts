@@ -3,6 +3,14 @@ import { useAuthStore } from "@/store/authStore";
 
 const WS_URL = BASE_URL.replace(/^http/, "ws") + "/ws/chat";
 
+// 연결 상태
+export type ConnectionStatus =
+  | "DISCONNECTED" // 연결 안 됨
+  | "CONNECTING" // 연결 중
+  | "CONNECTED" // 연결됨
+  | "RECONNECTING" // 재연결 중
+  | "ERROR"; // 에러 발생
+
 type IncomingMessage =
   | { type: "INFO"; payload: { message: string } }
   | { type: "ERROR"; payload: { reason: string; message: string } }
@@ -10,18 +18,31 @@ type IncomingMessage =
   | { type: "READ"; payload: { reader_nickname: string } };
 
 type MessageHandler = (msg: IncomingMessage) => void;
+type StatusHandler = (status: ConnectionStatus) => void;
+type ErrorHandler = (reason: string, message: string) => void;
 
 class ChatSocketManager {
   private socket: WebSocket | null = null;
   private roomId: number | null = null;
   private messageHandler: MessageHandler | null = null;
+  private statusHandler: StatusHandler | null = null;
+  private errorHandler: ErrorHandler | null = null;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private isManualClose = false;
+  private status: ConnectionStatus = "DISCONNECTED";
+  private reconnectAttempts = 0;
+  private maxReconnectAttempts = 5;
+
+  private setStatus(status: ConnectionStatus) {
+    this.status = status;
+    this.statusHandler?.(status);
+  }
 
   connect(
     roomId: number,
     onMessage: MessageHandler,
-    onError?: (reason: string) => void,
+    onStatus?: StatusHandler,
+    onError?: ErrorHandler,
   ) {
     if (this.socket?.readyState === WebSocket.OPEN && this.roomId === roomId)
       return;
@@ -30,17 +51,24 @@ class ChatSocketManager {
     this.isManualClose = false;
     this.roomId = roomId;
     this.messageHandler = onMessage;
+    this.statusHandler = onStatus ?? null;
+    this.errorHandler = onError ?? null;
 
     const token = useAuthStore.getState().token;
     if (!token) {
       console.warn("[ChatSocket] 토큰 없음");
+      this.setStatus("ERROR");
       return;
     }
+
+    this.setStatus(this.reconnectAttempts > 0 ? "RECONNECTING" : "CONNECTING");
 
     this.socket = new WebSocket(`${WS_URL}?token=${token}`);
 
     this.socket.onopen = () => {
       console.log("[ChatSocket] 연결 성공");
+      this.reconnectAttempts = 0;
+      this.setStatus("CONNECTED");
       this.send({ type: "JOIN", room_id: roomId });
     };
 
@@ -55,7 +83,7 @@ class ChatSocketManager {
             data.payload.reason,
             data.payload.message,
           );
-          onError?.(data.payload.reason);
+          this.errorHandler?.(data.payload.reason, data.payload.message);
           return;
         }
 
@@ -67,13 +95,39 @@ class ChatSocketManager {
 
     this.socket.onclose = (event) => {
       console.log("[ChatSocket] 연결 종료", event.code);
+
       if (!this.isManualClose) {
+        // 최대 재연결 시도 횟수 초과
+        if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+          console.warn("[ChatSocket] 재연결 최대 시도 횟수 초과");
+          this.setStatus("ERROR");
+          return;
+        }
+
+        this.reconnectAttempts++;
+        this.setStatus("RECONNECTING");
+
+        const delay = Math.min(
+          5000 * Math.pow(2, this.reconnectAttempts - 1),
+          30000,
+        ); // exponential backoff (5s, 10s, 20s, 30s, 30s)
+
+        console.log(
+          `[ChatSocket] ${delay}ms 후 재연결 시도 (${this.reconnectAttempts}/${this.maxReconnectAttempts})`,
+        );
+
         this.reconnectTimer = setTimeout(() => {
-          console.log("[ChatSocket] 재연결 시도...");
           if (this.roomId && this.messageHandler) {
-            this.connect(this.roomId, this.messageHandler, onError);
+            this.connect(
+              this.roomId,
+              this.messageHandler,
+              this.statusHandler ?? undefined,
+              this.errorHandler ?? undefined,
+            );
           }
-        }, 5000);
+        }, delay);
+      } else {
+        this.setStatus("DISCONNECTED");
       }
     };
 
@@ -97,6 +151,18 @@ class ChatSocketManager {
     return true;
   }
 
+  // 수동 재연결 (사용자가 버튼 누를 때)
+  manualReconnect() {
+    if (!this.roomId || !this.messageHandler) return;
+    this.reconnectAttempts = 0;
+    this.connect(
+      this.roomId,
+      this.messageHandler,
+      this.statusHandler ?? undefined,
+      this.errorHandler ?? undefined,
+    );
+  }
+
   private send(data: object) {
     if (this.socket?.readyState === WebSocket.OPEN) {
       this.socket.send(JSON.stringify(data));
@@ -115,10 +181,17 @@ class ChatSocketManager {
     }
     this.roomId = null;
     this.messageHandler = null;
+    this.statusHandler = null;
+    this.errorHandler = null;
+    this.reconnectAttempts = 0;
   }
 
   isConnected(): boolean {
     return this.socket?.readyState === WebSocket.OPEN;
+  }
+
+  getStatus(): ConnectionStatus {
+    return this.status;
   }
 }
 
