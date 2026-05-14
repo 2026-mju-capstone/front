@@ -248,6 +248,10 @@ export default function ChatRoomScreen() {
   const reopenChatRoomMutation = useChatMutations.useReopenChatRoom(roomIdNum);
 
   const chatRoom = roomData?.success ? roomData.data : null;
+  const counterpartNickname =
+    profile?.nickname === chatRoom?.owner_nickname
+      ? chatRoom?.finder_nickname
+      : chatRoom?.owner_nickname;
   const messages = messagesData?.success ? messagesData.data.messages : [];
   const isClosed = chatRoom?.status !== "OPEN";
   const isLoading = isRoomLoading || isMessagesLoading;
@@ -451,7 +455,7 @@ export default function ChatRoomScreen() {
         </View>
         <View style={styles.headerInfo}>
           <Text style={styles.headerTitle} numberOfLines={1}>
-            {chatRoom?.owner_nickname ?? "채팅"}
+            {counterpartNickname ?? "채팅"}
           </Text>
           {chatRoom?.item_name ? (
             <Text style={styles.headerSub} numberOfLines={1}>

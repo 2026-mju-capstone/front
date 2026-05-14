@@ -3,20 +3,19 @@ import { ChatRoomRecord } from "@/api/types";
 import { fonts } from "@/constants/typography";
 import { ROUTES } from "@/constants/url";
 import { useChatQueries } from "@/hooks/queries/useChatQueries";
-import { useQueryClient } from "@tanstack/react-query";
+import { useProfile } from "@/hooks/queries/useUserQueries";
 import { useRouter } from "expo-router";
 import { Bell, MessageCircle, User } from "lucide-react-native";
 import { useEffect, useState } from "react";
 import {
-    FlatList,
-    RefreshControl,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  FlatList,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-
 
 function timeAgo(dateStr: string) {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -28,12 +27,34 @@ function timeAgo(dateStr: string) {
   return "어제";
 }
 
+const ChatRoomSkeleton = () => (
+  <View style={styles.chatCard}>
+    <View style={[styles.avatar, styles.skeleton]} />
+    <View style={styles.chatInfo}>
+      <View
+        style={[
+          styles.skeletonLine,
+          { width: "40%", height: 15, marginBottom: 6 },
+        ]}
+      />
+      <View
+        style={[
+          styles.skeletonLine,
+          { width: "60%", height: 12, marginBottom: 6 },
+        ]}
+      />
+      <View style={[styles.skeletonLine, { width: "30%", height: 12 }]} />
+    </View>
+  </View>
+);
+
 export default function ChatScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const queryClient = useQueryClient();
+  const { data: profile } = useProfile();
   const [chatRooms, setChatRooms] = useState<ChatRoomRecord[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   const { data: roomListData, refetch } = useChatQueries.useChatRooms();
 
@@ -42,9 +63,11 @@ export default function ChatScreen() {
   }, [roomListData]);
 
   const loadChatRooms = async () => {
+    setIsLoading(true);
     const ids = roomListData?.data?.chatRoomIds;
     if (!ids?.length) {
       setChatRooms([]);
+      setIsLoading(false);
       return;
     }
     try {
@@ -58,6 +81,8 @@ export default function ChatScreen() {
     } catch (e) {
       console.error("채팅방 목록 조회 실패", e);
       setChatRooms([]);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -87,66 +112,83 @@ export default function ChatScreen() {
         </View>
       </View>
 
-      <FlatList
-        data={chatRooms}
-        keyExtractor={(item) => String(item.room_id)}
-        contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={isRefreshing}
-            onRefresh={onRefresh}
-            colors={["#6366f1"]}
-            tintColor="#6366f1"
-          />
-        }
-        ListEmptyComponent={
-          <View style={styles.emptyBox}>
-            <View style={styles.emptyIconWrap}>
-              <MessageCircle size={36} color="#6366f1" />
-            </View>
-            <Text style={styles.emptyTitle}>채팅이 없어요</Text>
-            <Text style={styles.emptyDesc}>
-              분실물 게시글에서 채팅으로 문의해보세요
-            </Text>
-          </View>
-        }
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={styles.chatCard}
-            onPress={() =>
-              router.push({
-                pathname: "/chat-room",
-                params: { roomId: item.room_id },
-              })
-            }
-            activeOpacity={0.6}
-          >
-            <View style={styles.avatar}>
-              <User size={24} color="#aaa" />
-            </View>
-            <View style={styles.chatInfo}>
-              <View style={styles.chatTopRow}>
-                <Text style={styles.chatNickname} numberOfLines={1}>
-                  {item.owner_nickname}
-                </Text>
+      {isLoading ? (
+        <View>
+          <ChatRoomSkeleton />
+          <ChatRoomSkeleton />
+          <ChatRoomSkeleton />
+          <ChatRoomSkeleton />
+          <ChatRoomSkeleton />
+        </View>
+      ) : (
+        <FlatList
+          data={chatRooms}
+          keyExtractor={(item) => String(item.room_id)}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={onRefresh}
+              colors={["#6366f1"]}
+              tintColor="#6366f1"
+            />
+          }
+          ListEmptyComponent={
+            <View style={styles.emptyBox}>
+              <View style={styles.emptyIconWrap}>
+                <MessageCircle size={36} color="#6366f1" />
               </View>
-              <Text style={styles.chatItemDetail} numberOfLines={1}>
-                {item.item_name}
+              <Text style={styles.emptyTitle}>채팅이 없어요</Text>
+              <Text style={styles.emptyDesc}>
+                분실물 게시글에서 채팅으로 문의해보세요
               </Text>
-              <View style={styles.chatBottomRow}>
-                <Text style={styles.chatStatus} numberOfLines={1}>
-                  {item.status === "OPEN"
-                    ? "진행 중"
-                    : item.status === "RESOLVED_RETURNED"
-                      ? "반환 완료"
-                      : "종료"}
-                </Text>
-              </View>
             </View>
-          </TouchableOpacity>
-        )}
-      />
+          }
+          renderItem={({ item }) => {
+            const counterpartNickname =
+              profile?.nickname === item.owner_nickname
+                ? item.finder_nickname
+                : item.owner_nickname;
+
+            return (
+              <TouchableOpacity
+                style={styles.chatCard}
+                onPress={() =>
+                  router.push({
+                    pathname: "/chat-room",
+                    params: { roomId: item.room_id },
+                  })
+                }
+                activeOpacity={0.6}
+              >
+                <View style={styles.avatar}>
+                  <User size={24} color="#aaa" />
+                </View>
+                <View style={styles.chatInfo}>
+                  <View style={styles.chatTopRow}>
+                    <Text style={styles.chatNickname} numberOfLines={1}>
+                      {counterpartNickname}
+                    </Text>
+                  </View>
+                  <Text style={styles.chatItemDetail} numberOfLines={1}>
+                    {item.item_name}
+                  </Text>
+                  <View style={styles.chatBottomRow}>
+                    <Text style={styles.chatStatus} numberOfLines={1}>
+                      {item.status === "OPEN"
+                        ? "진행 중"
+                        : item.status === "RESOLVED_RETURNED"
+                          ? "반환 완료"
+                          : "종료"}
+                    </Text>
+                  </View>
+                </View>
+              </TouchableOpacity>
+            );
+          }}
+        />
+      )}
     </View>
   );
 }
@@ -189,6 +231,14 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderWidth: 1.5,
     borderColor: "#6366f130",
+  },
+  skeleton: {
+    backgroundColor: "#f0f0f0",
+    borderWidth: 0,
+  },
+  skeletonLine: {
+    backgroundColor: "#f0f0f0",
+    borderRadius: 6,
   },
   chatInfo: { flex: 1, gap: 3 },
   chatTopRow: {
