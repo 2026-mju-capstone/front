@@ -1,37 +1,37 @@
 import { BASE_BUILDINGS } from "@/constants/buildings";
 import {
-    CATEGORY_ICON_MAP,
-    CATEGORY_MAP,
-    CATEGORY_TO_API,
-    ITEM_STATUS_STYLE,
-    ITEM_TYPE_MAP,
+  CATEGORY_ICON_MAP,
+  CATEGORY_MAP,
+  CATEGORY_TO_API,
+  ITEM_STATUS_STYLE,
+  ITEM_TYPE_MAP,
 } from "@/constants/categories";
 import { fonts } from "@/constants/typography";
 import { BASE_URL, ROUTES } from "@/constants/url";
 import { useItemQueries } from "@/hooks/queries/useItemQueries";
 import { useRouter } from "expo-router";
 import {
-    Bell,
-    ChevronDown,
-    MapPin,
-    Package,
-    Plus,
-    Search,
-    User,
-    X,
+  Bell,
+  ChevronDown,
+  MapPin,
+  Package,
+  Plus,
+  Search,
+  User,
+  X,
 } from "lucide-react-native";
 import { useMemo, useState } from "react";
 import {
-    ActivityIndicator,
-    FlatList,
-    Image,
-    RefreshControl,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    TouchableWithoutFeedback,
-    View,
+  ActivityIndicator,
+  FlatList,
+  Image,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  TouchableWithoutFeedback,
+  View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -96,24 +96,32 @@ export default function LostItemBoard() {
   }, [data]);
 
   const filtered = useMemo(() => {
-    return items.filter((item) => {
-      const korCategory = CATEGORY_MAP[item.category] ?? "기타";
-      const buildingName =
-        BASE_BUILDINGS.find((b) => b.id === item.building_id)?.name ?? "";
-      const matchType =
-        typeFilter === "전체" ||
-        (typeFilter === "찾는중" && item.type === "LOST") ||
-        (typeFilter === "발견됨" && item.type === "FOUND");
-      const matchCategory =
-        category === "전체" || CATEGORY_TO_API[category] === item.category;
-      const matchSearch =
-        searchQuery === "" ||
-        item.title?.includes(searchQuery) ||
-        korCategory.includes(searchQuery) ||
-        buildingName.includes(searchQuery) ||
-        item.data_address?.includes(searchQuery);
-      return matchType && matchCategory && matchSearch;
-    });
+    return (
+      items
+        .filter((item) => {
+          const korCategory = CATEGORY_MAP[item.category] ?? "기타";
+          const buildingName =
+            BASE_BUILDINGS.find((b) => b.id === item.building_id)?.name ?? "";
+          const matchType =
+            typeFilter === "전체" ||
+            (typeFilter === "찾는중" && item.type === "LOST") ||
+            (typeFilter === "발견됨" && item.type === "FOUND");
+          const matchCategory =
+            category === "전체" || CATEGORY_TO_API[category] === item.category;
+          const matchSearch =
+            searchQuery === "" ||
+            item.title?.includes(searchQuery) ||
+            korCategory.includes(searchQuery) ||
+            buildingName.includes(searchQuery) ||
+            item.data_address?.includes(searchQuery);
+          return matchType && matchCategory && matchSearch;
+        })
+        // 최신순 정렬 추가
+        .sort(
+          (a, b) =>
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+        )
+    );
   }, [items, typeFilter, category, searchQuery]);
 
   const closeDropdowns = () => {

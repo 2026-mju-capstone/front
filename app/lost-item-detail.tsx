@@ -6,7 +6,8 @@ import {
   ITEM_TYPE_MAP,
 } from "@/constants/categories";
 import { fonts } from "@/constants/typography";
-import { BASE_URL, ROUTES } from "@/constants/url";
+import { BASE_URL } from "@/constants/url";
+import { useChatMutations } from "@/hooks/mutations/useChatMutations";
 import { useItemQueries } from "@/hooks/queries/useItemQueries";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
@@ -17,7 +18,7 @@ import {
   Share2,
   X,
 } from "lucide-react-native";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -52,6 +53,8 @@ export default function LostItemDetail() {
   const [showImageModal, setShowImageModal] = useState(false);
 
   const { data: response, isLoading } = useItemQueries.useItemDetail(id!);
+  const createChatRoomMutation = useChatMutations.useCreateChatRoom();
+
   const item = response?.success ? response.data : null;
 
   const imageUrl = item?.image_url
@@ -59,6 +62,45 @@ export default function LostItemDetail() {
       ? item.image_url
       : `${BASE_URL}${item.image_url}`
     : null;
+
+  // 채팅 버튼 클릭 핸들러 (테스트용 ID 하드코딩)
+  const handleChatPress = useCallback(() => {
+    if (!item) return;
+
+    console.log("reporter_id:", item.reporter_id); // 추가!
+    console.log("=== 채팅 생성 테스트 시작 ===");
+    console.log("아이템 ID:", item.id);
+
+    createChatRoomMutation.mutate(
+      {
+        item_id: item.id,
+        // 테스트를 위해 에뮬레이터 계정 ID를 1로 가정하고 하드코딩합니다.
+        //counterpart_id: 1,
+        // reporter_id 추가되면
+        counterpart_id: item.reporter_id ?? 0,
+      },
+      {
+        onSuccess: (res) => {
+          console.log("채팅방 생성 성공:", JSON.stringify(res, null, 2)); // 이걸로 교체
+          if (res.success && res.data.room_data) {
+            console.log("ROOM ID:", res.data.room_data.room_id); // 이것도 추가
+            // Expo Router 타입 시스템에 맞춘 안전한 이동 방식
+            router.push({
+              pathname: "/chat-room",
+              params: { roomId: res.data.room_data.room_id },
+            });
+          }
+        },
+        onError: (error) => {
+          console.error("채팅방 생성 실패:", error);
+          Alert.alert(
+            "알림",
+            "채팅방을 연결할 수 없습니다. 서버 로그를 확인하세요.",
+          );
+        },
+      },
+    );
+  }, [item, createChatRoomMutation, router]);
 
   const handleShare = async () => {
     if (!item) return;
@@ -84,7 +126,6 @@ export default function LostItemDetail() {
         {
           text: "맞아요!",
           onPress: () => {
-            // TODO: 매칭 요청 API 연결
             Alert.alert("요청 완료", "매칭 요청을 보냈어요!");
           },
         },
@@ -142,23 +183,7 @@ export default function LostItemDetail() {
   const hasLocation = lat != null && lng != null;
 
   const mapHTML = hasLocation
-    ? `
-    <!DOCTYPE html><html>
-    <head>
-      <meta charset="utf-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-      <style>* { margin: 0; padding: 0; box-sizing: border-box; } html, body, #map { width: 100%; height: 100%; }</style>
-    </head>
-    <body>
-      <div id="map"></div>
-      <script type="text/javascript" src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=${KAKAO_API_KEY}&autoload=true"></script>
-      <script>
-        var map = new kakao.maps.Map(document.getElementById('map'), { center: new kakao.maps.LatLng(${lat}, ${lng}), level: 3 });
-        new kakao.maps.Marker({ position: new kakao.maps.LatLng(${lat}, ${lng}), map: map });
-      </script>
-    </body>
-    </html>
-  `
+    ? `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"><style>* { margin: 0; padding: 0; box-sizing: border-box; } html, body, #map { width: 100%; height: 100%; }</style></head><body><div id="map"></div><script type="text/javascript" src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=${KAKAO_API_KEY}&autoload=true"></script><script>var map = new kakao.maps.Map(document.getElementById('map'), { center: new kakao.maps.LatLng(${lat}, ${lng}), level: 3 }); new kakao.maps.Marker({ position: new kakao.maps.LatLng(${lat}, ${lng}), map: map });</script></body></html>`
     : "";
 
   return (
@@ -229,14 +254,14 @@ export default function LostItemDetail() {
             </View>
           </View>
 
-          {item.description ? (
+          {item.description && (
             <View style={styles.descSection}>
               <Text style={styles.sectionLabel}>상세 설명</Text>
               <Text style={styles.descText}>{item.description}</Text>
             </View>
-          ) : null}
+          )}
 
-          {hasLocation ? (
+          {hasLocation && (
             <>
               <Text style={styles.sectionLabel}>위치</Text>
               <View style={styles.mapWrap}>
@@ -249,7 +274,7 @@ export default function LostItemDetail() {
                 />
               </View>
             </>
-          ) : null}
+          )}
 
           <View style={styles.chatBanner}>
             <View style={styles.chatBannerIcon}>
@@ -277,11 +302,18 @@ export default function LostItemDetail() {
         )}
         <TouchableOpacity
           style={styles.chatBtn}
-          onPress={() => router.push(ROUTES.CHAT)}
+          onPress={handleChatPress}
           activeOpacity={0.85}
+          disabled={createChatRoomMutation.isPending}
         >
-          <MessageCircle size={18} color="#fff" />
-          <Text style={styles.chatBtnText}>채팅으로 문의하기</Text>
+          {createChatRoomMutation.isPending ? (
+            <ActivityIndicator color="#fff" size="small" />
+          ) : (
+            <>
+              <MessageCircle size={18} color="#fff" />
+              <Text style={styles.chatBtnText}>채팅으로 문의하기</Text>
+            </>
+          )}
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.shareBtn}

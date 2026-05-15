@@ -136,7 +136,7 @@ export interface ImageUploadResponse {
 
 // Lost Item Types
 export type ItemType = "LOST" | "FOUND";
-export type ItemStatus = "REPORTED" | "RESOLVED"; // Swagger mentions REPORTED
+export type ItemStatus = "REPORTED" | "RESOLVED";
 
 export interface ItemPost {
   id: number;
@@ -149,6 +149,7 @@ export interface ItemPost {
   building_id: number;
   data_address: string;
   created_at: string;
+  reporter_id?: number; // 백엔드 추가 예정
 }
 
 export interface ItemListResponse {
@@ -173,8 +174,6 @@ export interface CreateItemRequest {
   building_id: number;
   detail_address: string;
   reported_at: string;
-  // Swagger example doesn't show category/color, but List/Detail do.
-  // Adding them as they are likely needed.
   category: string;
   color: string;
 }
@@ -183,6 +182,12 @@ export interface CreateItemResponse {
   itemId: number;
   message: string;
   item_status: string;
+}
+
+// QR 스캔 시 물품 소유자 정보
+export interface ItemOwnerInfoResult {
+  nickname: string;
+  department: string;
 }
 
 // Chat Types
@@ -197,6 +202,7 @@ export interface ChatRoomRecord {
   owner_nickname: string;
   finder_nickname: string;
   item_name: string;
+  item_id?: number; // 백엔드 추가 예정 (채팅방에서 게시글 상세로 이동 시 필요)
 }
 
 export interface MessageRecord {
@@ -254,6 +260,7 @@ export interface ItemMatchResultResponse {
   locationName: string;
   found_nickname: string;
   found_department: string;
+  finder_id?: number; // 백엔드 추가 예정 (시나리오 ⑤ 직접 전달 시 필요)
 }
 
 export interface MatchManualRequest {

@@ -1,4 +1,5 @@
 import { ApiResponse, ListMessagesResult, MessageRecord } from "@/api/types";
+import { ConnectionStatus } from "@/api/websocket/chatSocket";
 import { fonts } from "@/constants/typography";
 import { useChatMutations } from "@/hooks/mutations/useChatMutations";
 import {
@@ -15,10 +16,12 @@ import {
   MoreVertical,
   Package,
   Plus,
+  RefreshCw,
   Send,
   User,
+  WifiOff,
 } from "lucide-react-native";
-import { useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -52,6 +55,167 @@ function formatDateLabel(dateStr: string) {
   return `${d.getMonth() + 1}월 ${d.getDate()}일`;
 }
 
+const GROUP_TIME_THRESHOLD = 60 * 1000;
+
+const isSameGroup = (prev: MessageRecord, curr: MessageRecord): boolean => {
+  if (prev.sender_nickname !== curr.sender_nickname) return false;
+  if (prev.sender_id === null || curr.sender_id === null) return false;
+  const prevTime = new Date(prev.sent_at).getTime();
+  const currTime = new Date(curr.sent_at).getTime();
+  return Math.abs(currTime - prevTime) <= GROUP_TIME_THRESHOLD;
+};
+
+type DateItem = { type: "date"; label: string; key: string };
+type ListItem = MessageRecord | DateItem;
+
+const DateLabel = memo(({ label }: { label: string }) => (
+  <View style={styles.dateLabelWrap}>
+    <Text style={styles.dateLabel}>{label}</Text>
+  </View>
+));
+DateLabel.displayName = "DateLabel";
+
+const SystemMessage = memo(({ message }: { message: string }) => (
+  <View style={styles.systemMsgWrap}>
+    <Text style={styles.systemMsg}>{message}</Text>
+  </View>
+));
+SystemMessage.displayName = "SystemMessage";
+
+const ChatMessage = memo(
+  ({
+    msg,
+    isMine,
+    isFirstInGroup,
+    isLastInGroup,
+  }: {
+    msg: MessageRecord;
+    isMine: boolean;
+    isFirstInGroup: boolean;
+    isLastInGroup: boolean;
+  }) => {
+    return (
+      <View
+        style={[
+          styles.msgRow,
+          isMine && styles.msgRowMine,
+          !isLastInGroup && styles.msgRowGrouped,
+        ]}
+      >
+        {!isMine && (
+          <View style={styles.msgAvatarSlot}>
+            {isFirstInGroup && (
+              <View style={styles.msgAvatar}>
+                <User size={16} color="#aaa" />
+              </View>
+            )}
+          </View>
+        )}
+        <View style={styles.msgCol}>
+          {!isMine && isFirstInGroup && (
+            <Text style={styles.msgSender}>{msg.sender_nickname}</Text>
+          )}
+          <View
+            style={[
+              styles.msgBubble,
+              isMine ? styles.msgBubbleMine : styles.msgBubbleOther,
+              !isMine && !isFirstInGroup && styles.msgBubbleOtherContinued,
+              !isMine && !isLastInGroup && styles.msgBubbleOtherNotLast,
+              isMine && !isFirstInGroup && styles.msgBubbleMineContinued,
+              isMine && !isLastInGroup && styles.msgBubbleMineNotLast,
+            ]}
+          >
+            <Text style={[styles.msgText, isMine && styles.msgTextMine]}>
+              {msg.message}
+            </Text>
+          </View>
+          {isLastInGroup && (
+            <View style={styles.msgMeta}>
+              {isMine && !msg.read_at && (
+                <Text style={styles.unreadMark}>1</Text>
+              )}
+              <Text style={[styles.msgTime, isMine && styles.msgTimeMine]}>
+                {formatTime(msg.sent_at)}
+              </Text>
+            </View>
+          )}
+        </View>
+      </View>
+    );
+  },
+  (prev, next) =>
+    prev.msg.sent_at === next.msg.sent_at &&
+    prev.msg.message === next.msg.message &&
+    prev.msg.read_at === next.msg.read_at &&
+    prev.isMine === next.isMine &&
+    prev.isFirstInGroup === next.isFirstInGroup &&
+    prev.isLastInGroup === next.isLastInGroup,
+);
+ChatMessage.displayName = "ChatMessage";
+
+// 연결 상태 배너 컴포넌트
+const ConnectionBanner = memo(
+  ({
+    status,
+    onReconnect,
+  }: {
+    status: ConnectionStatus;
+    onReconnect: () => void;
+  }) => {
+    if (status === "CONNECTED") return null;
+
+    let bgColor = "#fef3c7";
+    let textColor = "#92400e";
+    let iconColor = "#f59e0b";
+    let message = "";
+    let showRetry = false;
+
+    if (status === "CONNECTING") {
+      message = "연결 중...";
+    } else if (status === "RECONNECTING") {
+      message = "재연결 중...";
+    } else if (status === "ERROR") {
+      bgColor = "#fee2e2";
+      textColor = "#991b1b";
+      iconColor = "#ef4444";
+      message = "연결에 실패했어요";
+      showRetry = true;
+    } else if (status === "DISCONNECTED") {
+      bgColor = "#f3f4f6";
+      textColor = "#6b7280";
+      iconColor = "#9ca3af";
+      message = "연결이 끊어졌어요";
+      showRetry = true;
+    }
+
+    return (
+      <View style={[styles.connectionBanner, { backgroundColor: bgColor }]}>
+        {status === "CONNECTING" || status === "RECONNECTING" ? (
+          <ActivityIndicator size="small" color={iconColor} />
+        ) : (
+          <WifiOff size={14} color={iconColor} />
+        )}
+        <Text style={[styles.connectionBannerText, { color: textColor }]}>
+          {message}
+        </Text>
+        {showRetry && (
+          <TouchableOpacity
+            style={styles.retryBtn}
+            onPress={onReconnect}
+            activeOpacity={0.7}
+          >
+            <RefreshCw size={12} color={textColor} />
+            <Text style={[styles.retryBtnText, { color: textColor }]}>
+              재시도
+            </Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    );
+  },
+);
+ConnectionBanner.displayName = "ConnectionBanner";
+
 export default function ChatRoomScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -63,16 +227,18 @@ export default function ChatRoomScreen() {
   const [inputText, setInputText] = useState("");
   const [showCloseModal, setShowCloseModal] = useState(false);
 
-  // Hooks
   const { data: profile } = useProfile();
   const { data: roomData, isLoading: isRoomLoading } =
     useChatQueries.useChatRoom(roomIdNum);
   const { data: messagesData, isLoading: isMessagesLoading } =
-    useChatQueries.useMessages(roomIdNum, false); // WebSocket 사용 시 폴링 OFF
+    useChatQueries.useMessages(roomIdNum, false);
 
-  // WebSocket 연결
-  const { sendMessage: wsSendMessage, isConnected: wsConnected } =
-    useChatSocket(roomIdNum, true);
+  const {
+    sendMessage: wsSendMessage,
+    isConnected: wsConnected,
+    reconnect,
+    status,
+  } = useChatSocket(roomIdNum, true);
 
   const sendMessageMutation = useChatMutations.useSendMessage(
     roomIdNum,
@@ -82,6 +248,10 @@ export default function ChatRoomScreen() {
   const reopenChatRoomMutation = useChatMutations.useReopenChatRoom(roomIdNum);
 
   const chatRoom = roomData?.success ? roomData.data : null;
+  const counterpartNickname =
+    profile?.nickname === chatRoom?.owner_nickname
+      ? chatRoom?.finder_nickname
+      : chatRoom?.owner_nickname;
   const messages = messagesData?.success ? messagesData.data.messages : [];
   const isClosed = chatRoom?.status !== "OPEN";
   const isLoading = isRoomLoading || isMessagesLoading;
@@ -90,18 +260,15 @@ export default function ChatRoomScreen() {
     if (messages.length > 0) {
       flatListRef.current?.scrollToEnd({ animated: false });
     }
-  }, [messages]);
+  }, [messages.length]);
 
-  const sendMessage = async () => {
+  const sendMessage = useCallback(async () => {
     if (!inputText.trim()) return;
     const text = inputText.trim();
     setInputText("");
 
     if (wsConnected) {
-      // WebSocket으로 전송
       wsSendMessage(text);
-
-      // Optimistic Update (내 메시지 즉시 표시)
       queryClient.setQueryData<ApiResponse<ListMessagesResult>>(
         CHAT_QUERY_KEYS.messages(roomIdNum),
         (old) => {
@@ -124,7 +291,14 @@ export default function ChatRoomScreen() {
       );
       flatListRef.current?.scrollToEnd({ animated: true });
     } else {
-      // WebSocket 연결 안 됐을 때 HTTP 폴백
+      // WebSocket 안 됐을 때 HTTP 폴백 + 사용자에게 알림
+      Toast.show({
+        type: "info",
+        text1: "실시간 연결이 끊겼어요",
+        text2: "메시지는 전송되지만 받는 데 시간이 걸릴 수 있어요.",
+        position: "bottom",
+        visibilityTime: 2500,
+      });
       sendMessageMutation.mutate(text, {
         onError: () => {
           Toast.show({
@@ -141,35 +315,46 @@ export default function ChatRoomScreen() {
         },
       });
     }
-  };
+  }, [
+    inputText,
+    wsConnected,
+    wsSendMessage,
+    queryClient,
+    roomIdNum,
+    profile,
+    sendMessageMutation,
+  ]);
 
-  const handleClose = (reason: "RETURNED" | "ABANDONED") => {
-    setShowCloseModal(false);
-    closeChatRoomMutation.mutate(reason, {
-      onSuccess: () => {
-        Toast.show({
-          type: "success",
-          text1:
-            reason === "RETURNED"
-              ? "반환 완료 처리되었어요"
-              : "거래가 종료되었어요",
-          position: "bottom",
-          visibilityTime: 2500,
-        });
-      },
-      onError: () => {
-        Toast.show({
-          type: "error",
-          text1: "거래 종료 실패",
-          text2: "다시 시도해주세요.",
-          position: "bottom",
-          visibilityTime: 2500,
-        });
-      },
-    });
-  };
+  const handleClose = useCallback(
+    (reason: "RETURNED" | "ABANDONED") => {
+      setShowCloseModal(false);
+      closeChatRoomMutation.mutate(reason, {
+        onSuccess: () => {
+          Toast.show({
+            type: "success",
+            text1:
+              reason === "RETURNED"
+                ? "반환 완료 처리되었어요"
+                : "거래가 종료되었어요",
+            position: "bottom",
+            visibilityTime: 2500,
+          });
+        },
+        onError: () => {
+          Toast.show({
+            type: "error",
+            text1: "거래 종료 실패",
+            text2: "다시 시도해주세요.",
+            position: "bottom",
+            visibilityTime: 2500,
+          });
+        },
+      });
+    },
+    [closeChatRoomMutation],
+  );
 
-  const handleReopen = () => {
+  const handleReopen = useCallback(() => {
     reopenChatRoomMutation.mutate(undefined, {
       onSuccess: () => {
         Toast.show({
@@ -189,13 +374,9 @@ export default function ChatRoomScreen() {
         });
       },
     });
-  };
+  }, [reopenChatRoomMutation]);
 
-  // 날짜 구분선 삽입
-  type DateItem = { type: "date"; label: string; key: string };
-  type MessageItem = (typeof messages)[0] | DateItem;
-
-  const messagesWithDates: MessageItem[] = [];
+  const messagesWithDates: ListItem[] = [];
   let lastDate = "";
   messages.forEach((msg) => {
     const dateLabel = formatDateLabel(msg.sent_at);
@@ -209,6 +390,45 @@ export default function ChatRoomScreen() {
     }
     messagesWithDates.push(msg);
   });
+
+  const keyExtractor = useCallback((item: ListItem, i: number) => {
+    if ("key" in item) return item.key;
+    return `${item.sent_at}-${item.sender_id}-${i}`;
+  }, []);
+
+  const renderItem = useCallback(
+    ({ item, index }: { item: ListItem; index: number }) => {
+      if ("type" in item && item.type === "date") {
+        return <DateLabel label={item.label} />;
+      }
+      const msg = item as MessageRecord;
+      if (msg.sender_id === null) {
+        return <SystemMessage message={msg.message} />;
+      }
+      const isMine = msg.sender_nickname === profile?.nickname;
+
+      const prev = messagesWithDates[index - 1];
+      const next = messagesWithDates[index + 1];
+
+      const prevMsg =
+        prev && !("type" in prev) ? (prev as MessageRecord) : null;
+      const nextMsg =
+        next && !("type" in next) ? (next as MessageRecord) : null;
+
+      const isFirstInGroup = !prevMsg || !isSameGroup(prevMsg, msg);
+      const isLastInGroup = !nextMsg || !isSameGroup(msg, nextMsg);
+
+      return (
+        <ChatMessage
+          msg={msg}
+          isMine={isMine}
+          isFirstInGroup={isFirstInGroup}
+          isLastInGroup={isLastInGroup}
+        />
+      );
+    },
+    [profile?.nickname, messagesWithDates],
+  );
 
   if (isLoading) {
     return (
@@ -235,7 +455,7 @@ export default function ChatRoomScreen() {
         </View>
         <View style={styles.headerInfo}>
           <Text style={styles.headerTitle} numberOfLines={1}>
-            {chatRoom?.owner_nickname ?? "채팅"}
+            {counterpartNickname ?? "채팅"}
           </Text>
           {chatRoom?.item_name ? (
             <Text style={styles.headerSub} numberOfLines={1}>
@@ -243,15 +463,6 @@ export default function ChatRoomScreen() {
             </Text>
           ) : null}
         </View>
-        {/* WebSocket 연결 상태 표시 (개발용) */}
-        {__DEV__ && (
-          <View
-            style={[
-              styles.wsIndicator,
-              { backgroundColor: wsConnected ? "#22c55e" : "#f87171" },
-            ]}
-          />
-        )}
         {!isClosed ? (
           <TouchableOpacity
             style={styles.completeBtn}
@@ -268,6 +479,9 @@ export default function ChatRoomScreen() {
           <MoreVertical size={20} color="#555" />
         </TouchableOpacity>
       </View>
+
+      {/* 연결 상태 배너 */}
+      <ConnectionBanner status={status} onReconnect={reconnect} />
 
       {/* 분실물 배너 */}
       {chatRoom && (
@@ -292,7 +506,6 @@ export default function ChatRoomScreen() {
         </View>
       )}
 
-      {/* 메시지 목록 */}
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
@@ -301,69 +514,25 @@ export default function ChatRoomScreen() {
         <FlatList
           ref={flatListRef}
           data={messagesWithDates}
-          keyExtractor={(item, i) => ("key" in item ? item.key : String(i))}
+          keyExtractor={keyExtractor}
+          renderItem={renderItem}
           contentContainerStyle={styles.messageList}
           showsVerticalScrollIndicator={false}
           onContentSizeChange={() =>
             flatListRef.current?.scrollToEnd({ animated: false })
           }
+          removeClippedSubviews={Platform.OS === "android"}
+          maxToRenderPerBatch={10}
+          updateCellsBatchingPeriod={50}
+          windowSize={10}
+          initialNumToRender={20}
           ListEmptyComponent={
             <View style={styles.emptyBox}>
               <Text style={styles.emptyText}>첫 메시지를 보내보세요!</Text>
             </View>
           }
-          renderItem={({ item }) => {
-            if ("type" in item && item.type === "date") {
-              return (
-                <View style={styles.dateLabelWrap}>
-                  <Text style={styles.dateLabel}>{item.label}</Text>
-                </View>
-              );
-            }
-            const msg = item as (typeof messages)[0];
-            if (msg.sender_id === null) {
-              return (
-                <View style={styles.systemMsgWrap}>
-                  <Text style={styles.systemMsg}>{msg.message}</Text>
-                </View>
-              );
-            }
-            const isMine = msg.sender_nickname === profile?.nickname;
-            return (
-              <View style={[styles.msgRow, isMine && styles.msgRowMine]}>
-                {!isMine && (
-                  <View style={styles.msgAvatar}>
-                    <User size={16} color="#aaa" />
-                  </View>
-                )}
-                <View style={styles.msgCol}>
-                  <View
-                    style={[styles.msgBubble, isMine && styles.msgBubbleMine]}
-                  >
-                    <Text
-                      style={[styles.msgText, isMine && styles.msgTextMine]}
-                    >
-                      {msg.message}
-                    </Text>
-                  </View>
-                  <View style={styles.msgMeta}>
-                    {/* 읽음 표시 */}
-                    {isMine && !msg.read_at && (
-                      <Text style={styles.unreadMark}>1</Text>
-                    )}
-                    <Text
-                      style={[styles.msgTime, isMine && styles.msgTimeMine]}
-                    >
-                      {formatTime(msg.sent_at)}
-                    </Text>
-                  </View>
-                </View>
-              </View>
-            );
-          }}
         />
 
-        {/* 입력창 */}
         <View style={[styles.inputWrap, { paddingBottom: insets.bottom + 8 }]}>
           <TouchableOpacity style={styles.plusBtn}>
             <Plus size={22} color="#aaa" />
@@ -393,7 +562,6 @@ export default function ChatRoomScreen() {
         </View>
       </KeyboardAvoidingView>
 
-      {/* 거래 완료 모달 */}
       <Modal visible={showCloseModal} transparent animationType="fade">
         <Pressable
           style={styles.modalOverlay}
@@ -466,11 +634,6 @@ const styles = StyleSheet.create({
     color: "#aaa",
     marginTop: 1,
   },
-  wsIndicator: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
   completeBtn: {
     backgroundColor: "#eef2ff",
     paddingHorizontal: 12,
@@ -491,13 +654,40 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  // 연결 상태 배너
+  connectionBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    gap: 8,
+  },
+  connectionBannerText: {
+    fontSize: 12,
+    fontFamily: fonts.medium,
+  },
+  retryBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    backgroundColor: "rgba(0,0,0,0.05)",
+    marginLeft: 4,
+  },
+  retryBtnText: {
+    fontSize: 11,
+    fontFamily: fonts.bold,
+  },
   closedBanner: {
     alignItems: "center",
     paddingVertical: 10,
     backgroundColor: "#f5f6f8",
   },
   closedText: { fontSize: 13, fontFamily: fonts.bold, color: "#aaa" },
-  messageList: { paddingHorizontal: 16, paddingVertical: 16, gap: 8 },
+  messageList: { paddingHorizontal: 16, paddingVertical: 16 },
   dateLabelWrap: { alignItems: "center", paddingVertical: 12 },
   dateLabel: {
     fontSize: 12,
@@ -512,9 +702,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-end",
     gap: 8,
-    marginBottom: 4,
+    marginBottom: 10,
   },
   msgRowMine: { flexDirection: "row-reverse" },
+  msgRowGrouped: { marginBottom: 2 },
+  msgAvatarSlot: { width: 32 },
   msgAvatar: {
     width: 32,
     height: 32,
@@ -524,21 +716,31 @@ const styles = StyleSheet.create({
     borderColor: "#6366f130",
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 16,
   },
   msgCol: { maxWidth: "70%", gap: 3 },
+  msgSender: {
+    fontSize: 11,
+    fontFamily: fonts.regular,
+    color: "#888",
+    marginBottom: 4,
+    marginLeft: 4,
+  },
   msgBubble: {
-    backgroundColor: "#f3f4f6",
-    borderRadius: 18,
-    borderBottomLeftRadius: 4,
     paddingHorizontal: 14,
     paddingVertical: 10,
   },
+  msgBubbleOther: {
+    backgroundColor: "#f3f4f6",
+    borderRadius: 18,
+  },
   msgBubbleMine: {
     backgroundColor: "#6366f1",
-    borderBottomLeftRadius: 18,
-    borderBottomRightRadius: 4,
+    borderRadius: 18,
   },
+  msgBubbleOtherContinued: { borderTopLeftRadius: 4 },
+  msgBubbleOtherNotLast: { borderBottomLeftRadius: 4 },
+  msgBubbleMineContinued: { borderTopRightRadius: 4 },
+  msgBubbleMineNotLast: { borderBottomRightRadius: 4 },
   msgText: {
     fontSize: 14,
     fontFamily: fonts.regular,

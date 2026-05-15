@@ -5,26 +5,27 @@ import { useProfile } from "@/hooks/queries/useUserQueries";
 import { useAuthStore } from "@/store/authStore";
 import { useRouter } from "expo-router";
 import {
-    Bell,
-    ChevronRight,
-    Lock,
-    LogOut,
-    MessageCircle,
-    Package,
-    Pencil,
-    QrCode,
-    ShieldCheck,
-    TrendingUp,
-    User,
+  Bell,
+  Camera,
+  ChevronRight,
+  Lock,
+  LogOut,
+  MessageCircle,
+  Package,
+  Pencil,
+  QrCode,
+  ShieldCheck,
+  TrendingUp,
+  User,
 } from "lucide-react-native";
 import React, { useState } from "react";
 import {
-    Alert,
-    ScrollView,
-    Switch,
-    Text,
-    TouchableOpacity,
-    View,
+  Alert,
+  ScrollView,
+  Switch,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -47,9 +48,8 @@ export default function MyPageScreen() {
           try {
             await authService.logout();
             clearToken();
-            // router.replace는 _layout.tsx의 useEffect에서 자동으로 처리됨
           } catch (error) {
-            clearToken(); // 에러가 나더라도 로컬 토큰은 삭제
+            clearToken();
           }
         },
       },
@@ -60,8 +60,8 @@ export default function MyPageScreen() {
     {
       label: "AI 매칭 내역",
       icon: TrendingUp,
-      action: () => router.push(ROUTES.LOST_ITEM_BOARD),
-    }, // Link to appropriate screens
+      action: () => router.push(ROUTES.MATCHES),
+    },
     {
       label: "주은 물품 목록",
       icon: Package,
@@ -163,13 +163,73 @@ export default function MyPageScreen() {
           ))}
         </View>
 
+        {/* AI 매칭 + CCTV 분석 섹션 */}
+        <View className="flex-row gap-3 mx-4 mt-4">
+          {/* AI 매칭 카드 */}
+          <TouchableOpacity
+            className="flex-1 bg-white rounded-3xl p-4 border border-gray-100 shadow-sm overflow-hidden"
+            onPress={() => router.push(ROUTES.MATCHES)}
+            activeOpacity={0.85}
+          >
+            <View className="w-11 h-11 rounded-2xl bg-indigo-500 items-center justify-center mb-3">
+              <TrendingUp size={22} color="#fff" />
+            </View>
+            {/* 배경 원 장식 */}
+            <View
+              className="absolute top-3 right-3 w-16 h-16 rounded-full bg-indigo-100"
+              style={{ opacity: 0.4 }}
+            />
+            <Text className="text-sm font-pretendard-bold text-gray-900 mb-0.5">
+              AI 매칭
+            </Text>
+            <Text className="text-xs font-pretendard-regular text-gray-400 mb-2">
+              유사 분실물 자동 분석
+            </Text>
+            <View className="flex-row items-center gap-1">
+              <View className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+              <Text className="text-xs font-pretendard-bold text-indigo-500">
+                매칭 확인하기
+              </Text>
+            </View>
+          </TouchableOpacity>
+
+          {/* CCTV 분석 카드 */}
+          {/* TODO: PM 작업 예정 - router.push(ROUTES.CCTV_RESULT) 로 변경 */}
+          <TouchableOpacity
+            className="flex-1 bg-white rounded-3xl p-4 border border-gray-100 shadow-sm overflow-hidden"
+            onPress={() => router.push(ROUTES.CCTV_RESULT)}
+            activeOpacity={0.85}
+          >
+            <View className="w-11 h-11 rounded-2xl bg-red-400 items-center justify-center mb-3">
+              <Camera size={22} color="#fff" />
+            </View>
+            {/* 배경 원 장식 */}
+            <View
+              className="absolute top-3 right-3 w-16 h-16 rounded-full bg-red-100"
+              style={{ opacity: 0.4 }}
+            />
+            <Text className="text-sm font-pretendard-bold text-gray-900 mb-0.5">
+              CCTV 분석
+            </Text>
+            <Text className="text-xs font-pretendard-regular text-gray-400 mb-2">
+              도난 영상 분석 현황
+            </Text>
+            <View className="flex-row items-center gap-1">
+              <View className="w-1.5 h-1.5 rounded-full bg-gray-300" />
+              <Text className="text-xs font-pretendard-regular text-gray-400">
+                준비 중
+              </Text>
+            </View>
+          </TouchableOpacity>
+        </View>
+
         {/* Quick Menus */}
         <View className="mt-4 mx-4 bg-white rounded-3xl p-5 border border-gray-100 shadow-sm">
           <Text className="text-sm font-pretendard-bold text-gray-800 mb-4">
-            활동 내역
+            빠른 메뉴
           </Text>
           <View className="flex-row flex-wrap justify-between">
-            {quickMenus.map((menu, idx) => (
+            {quickMenus.map((menu) => (
               <TouchableOpacity
                 key={menu.label}
                 onPress={menu.action}
