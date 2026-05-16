@@ -5,8 +5,7 @@ import { handleNotificationRouting } from './routing';
 
 const readChatMessages = (data: NotificationData) => {
     const roomId: number = Number(data?.room_id);
-    // Not implemented
-    console.log(`Read messages for room ${roomId}`);
+    chatService.readChatRoom(roomId);
 }
 
 const sendChatMessage = (data: NotificationData, input: string | undefined) => {
