@@ -1,13 +1,13 @@
-import { BASE_URL, ROUTES } from "@/constants/url";
+import { BASE_URL } from "@/constants/url";
 import { useCctvMutations } from "@/hooks/mutations/useCctvMutations";
 import { useCctvQueries } from "@/hooks/queries/useCctvQueries";
 import { fonts } from "@/constants/typography";
 import { CctvDetection, CctvReviewStatus } from "@/api/types";
 import { mockCctvDetectionsByItemId } from "@/mocks/cctv"; // TODO(mock): 실서버 연동 시 이 줄 삭제
-import { Camera, CheckCircle2, ChevronLeft, Clock, HelpCircle, MapPin, Video, XCircle } from "lucide-react-native";
-import { useEffect, useState } from "react";
+import { Camera, CheckCircle2, ChevronLeft, Clock, HelpCircle, MapPin, Phone, Video, XCircle } from "lucide-react-native";
+import { useState } from "react";
 import {
-    ActivityIndicator, Dimensions, Image, Modal, Pressable,
+    ActivityIndicator, Dimensions, Image, Linking, Modal, Pressable,
     ScrollView, StyleSheet, Text, TouchableOpacity, View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -37,6 +37,7 @@ export default function CctvResultScreen() {
     const [selectedDetection, setSelectedDetection] = useState<CctvDetection | null>(null);
     const [modalType, setModalType] = useState<"confirm" | "reject" | null>(null);
     const [localReviewed, setLocalReviewed] = useState<Record<number, CctvReviewStatus>>({});
+    const [rejectedIds, setRejectedIds] = useState<Set<number>>(new Set());
 
     const { data, isLoading } = useCctvQueries.useItemDetections(parsedItemId);
     const reviewMutation = useCctvMutations.useReviewDetection(parsedItemId);
@@ -48,6 +49,23 @@ export default function CctvResultScreen() {
     };
     const closeModal = () => { setSelectedDetection(null); setModalType(null); };
 
+    const handleConfirmAndCall = () => {
+        if (!selectedDetection) return;
+        Linking.openURL("tel:112");
+        closeModal();
+        reviewMutation.mutate(
+            { detectionId: selectedDetection.detection_id, body: { review_status: "CONFIRMED_SELF" } },
+            {
+                onSuccess: () => {
+                    setLocalReviewed((prev) => ({ ...prev, [selectedDetection.detection_id]: "CONFIRMED_SELF" }));
+                },
+                onError: () => {
+                    Toast.show({ type: "error", text1: "처리 실패", text2: "다시 시도해주세요.", position: "bottom", visibilityTime: 2500 });
+                },
+            }
+        );
+    };
+
     const handleReview = (status: CctvReviewStatus) => {
         if (!selectedDetection) return;
         closeModal();
@@ -55,15 +73,7 @@ export default function CctvResultScreen() {
             { detectionId: selectedDetection.detection_id, body: { review_status: status } },
             {
                 onSuccess: () => {
-                    setLocalReviewed((prev) => ({ ...prev, [selectedDetection.detection_id]: status }));
-                    if (status === "CONFIRMED_SELF") {
-                        Toast.show({ type: "success", text1: "내 물건으로 확인했어요", position: "bottom", visibilityTime: 2000 });
-                        router.push(ROUTES.MATCHES);
-                    } else if (status === "REJECTED_SELF") {
-                        Toast.show({ type: "success", text1: "도난 의심 신고가 접수됐어요", position: "bottom", visibilityTime: 2500 });
-                    } else {
-                        Toast.show({ type: "info", text1: "나중에 다시 확인할게요", position: "bottom", visibilityTime: 2000 });
-                    }
+                    setRejectedIds((prev) => new Set(prev).add(selectedDetection.detection_id));
                 },
                 onError: () => {
                     Toast.show({ type: "error", text1: "처리 실패", text2: "다시 시도해주세요.", position: "bottom", visibilityTime: 2500 });
@@ -110,7 +120,7 @@ export default function CctvResultScreen() {
                             <Text style={styles.introDesc}>스냅샷을 확인하고 내 물건이 맞는지 알려주세요</Text>
                         </View>
 
-                        {detections.map((det) => {
+                        {detections.filter(d => !rejectedIds.has(d.detection_id)).map((det) => {
                             const reviewed = localReviewed[det.detection_id];
                             const isReviewed = reviewed !== undefined;
                             const scorePercent = Math.round(det.score * 100);
@@ -150,7 +160,7 @@ export default function CctvResultScreen() {
                                             )}
                                         </View>
                                         <View style={[styles.snapshotWrap, { width: SNAPSHOT_WIDTH }]}>
-                                            <Text style={styles.snapshotLabel}>발견 순간</Text>
+                                            <Text style={styles.snapshotLabel}>도난 의심 포착</Text>
                                             {momentSnapshotUri ? (
                                                 <Image source={{ uri: momentSnapshotUri }} style={[styles.snapshot, { width: SNAPSHOT_WIDTH }]} resizeMode="cover" />
                                             ) : (
@@ -186,26 +196,38 @@ export default function CctvResultScreen() {
             <Modal visible={modalType !== null} transparent animationType="fade">
                 <Pressable style={styles.modalOverlay} onPress={closeModal} />
                 <View style={styles.modalWrap}>
-                    <View style={styles.modalCard}>
-                        <Text style={styles.modalTitle}>
-                            {modalType === "confirm" ? "내 물건이 맞나요?" : "내 물건이 아닌가요?"}
-                        </Text>
-                        <Text style={styles.modalDesc}>
-                            {modalType === "confirm" ? "확정하면 매칭 절차가 진행되며,\n취소할 수 없어요."
-                                : "아닌 것으로 표시하면 도난 의심 신고가\n자동 접수돼요."}
-                        </Text>
-                        <TouchableOpacity
-                            style={[styles.modalBtn, modalType === "confirm" ? styles.modalBtnPrimary : styles.modalBtnDanger]}
-                            onPress={() => handleReview(modalType === "confirm" ? "CONFIRMED_SELF" : "REJECTED_SELF")}
-                        >
-                            <Text style={styles.modalBtnText}>
-                                {modalType === "confirm" ? "확정하기" : "신고하기"}
-                            </Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity style={styles.cancelBtn} onPress={closeModal}>
-                            <Text style={styles.cancelBtnText}>취소</Text>
-                        </TouchableOpacity>
-                    </View>
+                    {modalType === "confirm" ? (
+                        <View style={styles.modalCard}>
+                            <View style={styles.policeIconWrap}>
+                                <Phone size={28} color="#ef4444" />
+                            </View>
+                            <Text style={styles.modalTitle}>내 물건이 맞나요?</Text>
+                            <Text style={styles.modalDesc}>{"CCTV에서 해당 물건이 발견됐어요.\n도난이 의심된다면 112에 신고할 수 있어요."}</Text>
+                            <TouchableOpacity
+                                style={[styles.modalBtn, styles.modalBtnDanger]}
+                                onPress={handleConfirmAndCall}
+                            >
+                                <Text style={styles.modalBtnText}>112 신고하기</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={styles.cancelBtn} onPress={closeModal}>
+                                <Text style={styles.cancelBtnText}>나중에</Text>
+                            </TouchableOpacity>
+                        </View>
+                    ) : (
+                        <View style={styles.modalCard}>
+                            <Text style={styles.modalTitle}>내 물건이 아닌가요?</Text>
+                            <Text style={styles.modalDesc}>{"아닌 것으로 표시하면 목록에서 제거돼요."}</Text>
+                            <TouchableOpacity
+                                style={[styles.modalBtn, styles.modalBtnDanger]}
+                                onPress={() => handleReview("REJECTED_SELF")}
+                            >
+                                <Text style={styles.modalBtnText}>제거하기</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={styles.cancelBtn} onPress={closeModal}>
+                                <Text style={styles.cancelBtnText}>취소</Text>
+                            </TouchableOpacity>
+                        </View>
+                    )}
                 </View>
             </Modal>
         </View>
@@ -268,4 +290,8 @@ const styles = StyleSheet.create({
     modalBtnText: { fontSize: 15, fontFamily: fonts.bold, color: "#fff" },
     cancelBtn: { paddingVertical: 10, alignItems: "center" },
     cancelBtnText: { fontSize: 14, fontFamily: fonts.regular, color: "#aaa" },
+    policeIconWrap: {
+        width: 56, height: 56, borderRadius: 28, backgroundColor: "#fef2f2",
+        alignItems: "center", justifyContent: "center", alignSelf: "center", marginBottom: 4,
+    },
 });
