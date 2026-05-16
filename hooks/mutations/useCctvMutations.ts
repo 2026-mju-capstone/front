@@ -8,12 +8,12 @@ export const useCctvMutations = {
         const queryClient = useQueryClient();
         return useMutation({
             mutationFn: ({
-                             detectionId,
+                             matchId,
                              body,
                          }: {
-                detectionId: number;
+                matchId: number;
                 body: CctvReviewRequest;
-            }) => cctvService.reviewDetection(detectionId, body),
+            }) => cctvService.reviewDetection(matchId, body),
             onSuccess: () => {
                 queryClient.invalidateQueries({
                     queryKey: CCTV_QUERY_KEYS.itemDetections(itemId),

@@ -54,10 +54,10 @@ export default function CctvResultScreen() {
         Linking.openURL("tel:112");
         closeModal();
         reviewMutation.mutate(
-            { detectionId: selectedDetection.detection_id, body: { review_status: "CONFIRMED_SELF" } },
+            { matchId: selectedDetection.match_id, body: { review_status: "CONFIRMED_SELF" } },
             {
                 onSuccess: () => {
-                    setLocalReviewed((prev) => ({ ...prev, [selectedDetection.detection_id]: "CONFIRMED_SELF" }));
+                    setLocalReviewed((prev) => ({ ...prev, [selectedDetection.match_id]: "CONFIRMED_SELF" }));
                 },
                 onError: () => {
                     Toast.show({ type: "error", text1: "처리 실패", text2: "다시 시도해주세요.", position: "bottom", visibilityTime: 2500 });
@@ -70,10 +70,10 @@ export default function CctvResultScreen() {
         if (!selectedDetection) return;
         closeModal();
         reviewMutation.mutate(
-            { detectionId: selectedDetection.detection_id, body: { review_status: status } },
+            { matchId: selectedDetection.match_id, body: { review_status: status } },
             {
                 onSuccess: () => {
-                    setRejectedIds((prev) => new Set(prev).add(selectedDetection.detection_id));
+                    setRejectedIds((prev) => new Set(prev).add(selectedDetection.match_id));
                 },
                 onError: () => {
                     Toast.show({ type: "error", text1: "처리 실패", text2: "다시 시도해주세요.", position: "bottom", visibilityTime: 2500 });
@@ -120,8 +120,8 @@ export default function CctvResultScreen() {
                             <Text style={styles.introDesc}>스냅샷을 확인하고 내 물건이 맞는지 알려주세요</Text>
                         </View>
 
-                        {detections.filter(d => !rejectedIds.has(d.detection_id)).map((det) => {
-                            const reviewed = localReviewed[det.detection_id];
+                        {detections.filter(d => !rejectedIds.has(d.match_id)).map((det) => {
+                            const reviewed = localReviewed[det.match_id];
                             const isReviewed = reviewed !== undefined;
                             const scorePercent = Math.round(det.score * 100);
                             const itemSnapshotUri = det.item_snapshot_url
@@ -132,7 +132,7 @@ export default function CctvResultScreen() {
                                 : null;
 
                             return (
-                                <View key={det.detection_id} style={styles.card}>
+                                <View key={det.match_id} style={styles.card}>
                                     <View style={styles.cardTopRow}>
                                         <View style={styles.scoreBadge}>
                                             <Text style={styles.scoreText}>유사도 {scorePercent}%</Text>

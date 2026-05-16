@@ -293,7 +293,7 @@ export interface CctvMyItemsResponse {
 }
 
 export interface CctvDetection {
-    detection_id: number;
+    match_id: number;
     score: number;
     detected_at: string;
     building_name: string;
