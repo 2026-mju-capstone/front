@@ -38,8 +38,8 @@ export const ITEM_CATEGORIES_URL = BASE_URL + "/api/metadata/item-categories";
 export const IMAGE_UPLOAD_URL = BASE_URL + "/api/images/upload";
 
 export const CCTV_DETECTIONS_URL = BASE_URL + "/api/cctv/detections/me";
-export const CCTV_REVIEW_URL = (detectionId: number): string =>
-    BASE_URL + `/api/cctv/detections/${detectionId}/review`;
+export const CCTV_REVIEW_URL = (matchId: number): string =>
+    BASE_URL + `/api/cctv/detections/${matchId}/review`;
 
 // App Routes (Navigation)
 export const ROUTES = {

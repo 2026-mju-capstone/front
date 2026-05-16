@@ -2,7 +2,7 @@
 export interface ApiResponse<T> {
   success: boolean;
   data: T;
-  error?: string;
+  error: string | null;
 }
 
 // Auth Types
