@@ -275,3 +275,37 @@ export interface MatchManualResponse {
   match_manual_type: MatchManualType;
   locker_id: number;
 }
+
+
+export type CctvReviewStatus = "CONFIRMED_SELF" | "REJECTED_SELF";
+
+export interface CctvMatchedLostItem {
+    lost_item_id: number;
+    title: string;
+    category: string;
+    match_count: number;
+    reported_at: string;
+    image_url: string | null;
+}
+
+export interface CctvMyItemsResponse {
+    matched_lost_items: CctvMatchedLostItem[];
+}
+
+export interface CctvDetection {
+    detection_id: number;
+    score: number;
+    detected_at: string;
+    building_name: string;
+    room_name: string;
+    item_snapshot_url: string | null;
+    moment_snapshot_url: string | null;
+}
+
+export interface CctvItemDetectionsResponse {
+    detections: CctvDetection[];
+}
+
+export interface CctvReviewRequest {
+    review_status: CctvReviewStatus;
+}
