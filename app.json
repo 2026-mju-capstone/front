@@ -29,6 +29,7 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
+      "./scripts/withNotifeeMaven",
       "expo-router",
       [
         "expo-splash-screen",
@@ -63,7 +64,7 @@
         "expo-build-properties",
         {
           "android": {
-            "kotlinVersion": "1.9.24",
+            "kotlinVersion": "2.2.20",
             "compileSdkVersion": 35,
             "targetSdkVersion": 34,
             "buildToolsVersion": "35.0.0"
