@@ -49,7 +49,8 @@ const NOTIFICATION_DISPLAY_REGISTRY: Record<string, (message: ZoopickRemoteMessa
     ITEM_RETURNED: createSimpleNotification,
     MATCH_FOUND: createSimpleNotification,
     THEFT_SUSPECTED: createSimpleNotification,
-    LOCKER_READY: createSimpleNotification
+    LOCKER_READY: createSimpleNotification,
+    CCTV_FOUND: createSimpleNotification
 }
 
 export const displayNotification = async (message: ZoopickRemoteMessage) => {
