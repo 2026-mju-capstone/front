@@ -1,11 +1,15 @@
-import {authService} from "@/api/services/auth";
-import messaging, {RemoteMessage} from "@react-native-firebase/messaging";
-import {useEffect} from "react";
-import {PermissionsAndroid, Platform} from "react-native";
+import { authService } from "@/api/services/auth";
+import messaging from "@react-native-firebase/messaging";
+import { useEffect } from "react";
+import { PermissionsAndroid, Platform } from "react-native";
+import notifee from '@notifee/react-native';
+import { TokenCallback } from "@/utils/notifications/types";
+import { displayNotification } from "@/utils/notifications/display";
+import { notificationEventHandler } from "@/utils/notifications/handlers";
 
-export type TokenCallback = (token: string) => void;
-
-export type OpenNotificationAction = (remoteMessage: RemoteMessage) => void;
+export * from "@/utils/notifications/types";
+export { displayNotification } from "@/utils/notifications/display";
+export { handleNotificationRouting } from "@/utils/notifications/routing";
 
 // 로그인 성공 시 호출
 export const getFCMToken = async (callback: TokenCallback) => {
@@ -22,7 +26,7 @@ export const getFCMToken = async (callback: TokenCallback) => {
 
 export const sendTokenToServer: TokenCallback = async (token: string) => {
     try {
-        const result = await authService.registerDeviceToken({token});
+        const result = await authService.registerDeviceToken({ token });
         if (!result.success) {
             console.error(`Failed to register token: ${result.error}`);
         }
@@ -50,41 +54,24 @@ const requestNotificationPermission = async () => {
     return false;
 };
 
-export function useNotifications(
-    openNotificationAction: OpenNotificationAction | null = null,
-) {
+export function useNotifications() {
+    messaging().setBackgroundMessageHandler(displayNotification);
     useEffect(() => {
-        if (!requestNotificationPermission())
-            console.log("Notification permission denied");
+        messaging().registerDeviceForRemoteMessages();
 
-        const unsubscribeTokenRefresh =
-            messaging().onTokenRefresh(sendTokenToServer);
+        requestNotificationPermission().then(granted => {
+            if (!granted) console.log("Notification permission denied");
+        });
 
-        // 포그라운드 메시지 핸들러
-        const unsubscribeMessage = messaging().onMessage(
-            (remoteMessage: RemoteMessage) => {
-            },
-        );
-
-        // 알림 클릭 핸들러 (백그라운드에서 열렸을 때)
-        const unsubscribeNotificationOpened = messaging().onNotificationOpenedApp(
-            (remoteMessage: RemoteMessage) => {
-                if (openNotificationAction) openNotificationAction(remoteMessage);
-            },
-        );
-
-        // 앱이 완전히 종료된 상태에서 알림을 클릭해 열렸을 때
-        messaging()
-            .getInitialNotification()
-            .then((remoteMessage: RemoteMessage | null) => {
-                if (remoteMessage && openNotificationAction)
-                    openNotificationAction(remoteMessage);
-            });
+        const unsubscribeOnMessage = messaging().onMessage(displayNotification);
+        const unsubscribeTokenRefresh = messaging().onTokenRefresh(sendTokenToServer);
+        const unsubscribeForegroundEvent = notifee.onForegroundEvent(notificationEventHandler);
+        notifee.onBackgroundEvent(notificationEventHandler);
 
         return () => {
+            unsubscribeOnMessage();
             unsubscribeTokenRefresh();
-            unsubscribeMessage();
-            unsubscribeNotificationOpened();
+            unsubscribeForegroundEvent();
         };
     }, []);
 }

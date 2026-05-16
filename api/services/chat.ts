@@ -53,6 +53,15 @@ export const chatService = {
     return res.data;
   },
 
+  // 채팅방 읽기
+  readChatRoom: async (roomId: number) => {
+      const res = await client.get<ApiResponse<string>>(
+          `/api/chat-rooms/${roomId}/read`,
+          {},
+      );
+      return res.data;
+  },
+
   // 메시지 전송
   sendMessage: async (roomId: number, message: string) => {
     const res = await client.post<ApiResponse<string>>(
