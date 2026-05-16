@@ -1,7 +1,7 @@
 import { BASE_URL, ROUTES } from "@/constants/url";
 import { useCctvQueries } from "@/hooks/queries/useCctvQueries";
 import { fonts } from "@/constants/typography";
-import { mockCctvItems } from "@/mocks/cctv"; // TODO(mock): 실서버 연동 시 이 줄 삭제
+// import { mockCctvItems } from "@/mocks/cctv";
 import { Camera, ChevronLeft, ChevronRight, Package } from "lucide-react-native";
 import {
     ActivityIndicator,
@@ -17,17 +17,15 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useState } from "react";
 import { useRouter } from "expo-router";
 
-// TODO(mock): 실서버 연동 시 아래 한 줄 삭제
-const USE_MOCK = true;
-
 export default function CctvItemsScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const [isRefreshing, setIsRefreshing] = useState(false);
 
     const { data, isLoading, refetch } = useCctvQueries.useMyItems();
-    // TODO(mock): 실서버 연동 시 → data?.data?.data?.matched_lost_items ?? []
-    const items = USE_MOCK ? mockCctvItems : (data?.data?.data?.matched_lost_items ?? []);
+    // const USE_MOCK = true;
+    // const items = USE_MOCK ? mockCctvItems : (data?.data?.data?.matched_lost_items ?? []);
+    const items = data?.data?.data?.matched_lost_items ?? [];
 
     const onRefresh = async () => {
         setIsRefreshing(true);
@@ -35,8 +33,8 @@ export default function CctvItemsScreen() {
         setIsRefreshing(false);
     };
 
-    // TODO(mock): 실서버 연동 시 → if (isLoading) {
-    if (!USE_MOCK && isLoading) {
+    // if (!USE_MOCK && isLoading) {
+    if (isLoading) {
         return (
             <View style={[styles.container, { alignItems: "center", justifyContent: "center" }]}>
                 <ActivityIndicator color="#ef4444" size="large" />
