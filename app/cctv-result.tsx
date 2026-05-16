@@ -3,7 +3,7 @@ import { useCctvMutations } from "@/hooks/mutations/useCctvMutations";
 import { useCctvQueries } from "@/hooks/queries/useCctvQueries";
 import { fonts } from "@/constants/typography";
 import { CctvDetection, CctvReviewStatus } from "@/api/types";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { mockCctvDetectionsByItemId } from "@/mocks/cctv"; // TODO(mock): 실서버 연동 시 이 줄 삭제
 import { Camera, CheckCircle2, ChevronLeft, Clock, HelpCircle, MapPin, Video, XCircle } from "lucide-react-native";
 import { useEffect, useState } from "react";
 import {
@@ -12,6 +12,10 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Toast from "react-native-toast-message";
+import { useLocalSearchParams, useRouter } from "expo-router";
+
+// TODO(mock): 실서버 연동 시 아래 한 줄 삭제
+const USE_MOCK = true;
 
 const { width: screenWidth } = Dimensions.get("window");
 const SNAPSHOT_WIDTH = (screenWidth - 32) / 2;
@@ -34,7 +38,7 @@ export default function CctvResultScreen() {
     const [modalType, setModalType] = useState<"confirm" | "reject" | null>(null);
     const [localReviewed, setLocalReviewed] = useState<Record<number, CctvReviewStatus>>({});
 
-    const { data, isLoading, refetch } = useCctvQueries.useItemDetections(parsedItemId);
+    const { data, isLoading } = useCctvQueries.useItemDetections(parsedItemId);
     const reviewMutation = useCctvMutations.useReviewDetection(parsedItemId);
     const responseData = data?.data?.data;
 
@@ -68,7 +72,8 @@ export default function CctvResultScreen() {
         );
     };
 
-    if (isLoading) {
+    // TODO(mock): 실서버 연동 시 → if (isLoading) {
+    if (!USE_MOCK && isLoading) {
         return (
             <View style={[styles.container, { alignItems: "center", justifyContent: "center" }]}>
                 <ActivityIndicator color="#ef4444" size="large" />
@@ -76,7 +81,10 @@ export default function CctvResultScreen() {
         );
     }
 
-    const detections = responseData?.detections ?? [];
+    // TODO(mock): 실서버 연동 시 → responseData?.detections ?? []
+    const detections = USE_MOCK
+        ? (mockCctvDetectionsByItemId[parsedItemId] ?? [])
+        : (responseData?.detections ?? []);
 
     return (
         <View style={[styles.container, { paddingTop: insets.top }]}>

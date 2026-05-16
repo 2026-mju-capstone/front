@@ -1,7 +1,7 @@
 import { BASE_URL, ROUTES } from "@/constants/url";
 import { useCctvQueries } from "@/hooks/queries/useCctvQueries";
 import { fonts } from "@/constants/typography";
-import { useRouter } from "expo-router";
+import { mockCctvItems } from "@/mocks/cctv"; // TODO(mock): 실서버 연동 시 이 줄 삭제
 import { Camera, ChevronLeft, ChevronRight, Package } from "lucide-react-native";
 import {
     ActivityIndicator,
@@ -15,6 +15,10 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useState } from "react";
+import { useRouter } from "expo-router";
+
+// TODO(mock): 실서버 연동 시 아래 한 줄 삭제
+const USE_MOCK = true;
 
 export default function CctvItemsScreen() {
     const router = useRouter();
@@ -22,7 +26,8 @@ export default function CctvItemsScreen() {
     const [isRefreshing, setIsRefreshing] = useState(false);
 
     const { data, isLoading, refetch } = useCctvQueries.useMyItems();
-    const items = data?.data?.data?.matched_lost_items ?? [];
+    // TODO(mock): 실서버 연동 시 → data?.data?.data?.matched_lost_items ?? []
+    const items = USE_MOCK ? mockCctvItems : (data?.data?.data?.matched_lost_items ?? []);
 
     const onRefresh = async () => {
         setIsRefreshing(true);
@@ -30,7 +35,8 @@ export default function CctvItemsScreen() {
         setIsRefreshing(false);
     };
 
-    if (isLoading) {
+    // TODO(mock): 실서버 연동 시 → if (isLoading) {
+    if (!USE_MOCK && isLoading) {
         return (
             <View style={[styles.container, { alignItems: "center", justifyContent: "center" }]}>
                 <ActivityIndicator color="#ef4444" size="large" />
@@ -124,10 +130,10 @@ const styles = StyleSheet.create({
         padding: 14, gap: 12, shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 6, elevation: 2,
     },
     thumbnail: {
-        width: 60, height: 60, borderRadius: 12, backgroundColor: "#fef2f2",
+        width: 90, height: 90, borderRadius: 14, backgroundColor: "#fef2f2",
         alignItems: "center", justifyContent: "center", overflow: "hidden",
     },
-    thumbnailImage: { width: 60, height: 60 },
+    thumbnailImage: { width: 90, height: 90 },
     info: { flex: 1, gap: 4 },
     title: { fontSize: 14, fontFamily: fonts.bold, color: "#111" },
     categoryBadge: { alignSelf: "flex-start", backgroundColor: "#eef2ff", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2 },
