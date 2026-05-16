@@ -33,7 +33,7 @@ export const mockCctvDetectionsByItemId: Record<number, CctvDetection[]> = {
     // lost_item_id: 1 (파란 우산) — match_count: 3
     1: [
         {
-            detection_id: 101,
+            match_id: 101,
             score: 0.92,
             detected_at: "2026-05-15T09:30:00",
             building_name: "공학관",
@@ -42,7 +42,7 @@ export const mockCctvDetectionsByItemId: Record<number, CctvDetection[]> = {
             moment_snapshot_url: "https://picsum.photos/seed/moment101/400/300",
         },
         {
-            detection_id: 102,
+            match_id: 102,
             score: 0.75,
             detected_at: "2026-05-15T14:20:00",
             building_name: "도서관",
@@ -51,7 +51,7 @@ export const mockCctvDetectionsByItemId: Record<number, CctvDetection[]> = {
             moment_snapshot_url: "https://picsum.photos/seed/moment102/400/300",
         },
         {
-            detection_id: 103,
+            match_id: 103,
             score: 0.61,
             detected_at: "2026-05-16T10:05:00",
             building_name: "학생회관",
@@ -64,7 +64,7 @@ export const mockCctvDetectionsByItemId: Record<number, CctvDetection[]> = {
     // lost_item_id: 2 (에어팟 프로 케이스) — match_count: 1
     2: [
         {
-            detection_id: 201,
+            match_id: 201,
             score: 0.88,
             detected_at: "2026-05-15T11:45:00",
             building_name: "인문관",
@@ -77,7 +77,7 @@ export const mockCctvDetectionsByItemId: Record<number, CctvDetection[]> = {
     // lost_item_id: 3 (갈색 반지갑) — match_count: 5
     3: [
         {
-            detection_id: 301,
+            match_id: 301,
             score: 0.95,
             detected_at: "2026-05-14T08:10:00",
             building_name: "중앙도서관",
@@ -86,7 +86,7 @@ export const mockCctvDetectionsByItemId: Record<number, CctvDetection[]> = {
             moment_snapshot_url: "https://picsum.photos/seed/moment301/400/300",
         },
         {
-            detection_id: 302,
+            match_id: 302,
             score: 0.83,
             detected_at: "2026-05-14T13:30:00",
             building_name: "공학관",
@@ -95,7 +95,7 @@ export const mockCctvDetectionsByItemId: Record<number, CctvDetection[]> = {
             moment_snapshot_url: "https://picsum.photos/seed/moment302/400/300",
         },
         {
-            detection_id: 303,
+            match_id: 303,
             score: 0.71,
             detected_at: "2026-05-15T09:55:00",
             building_name: "학생식당",
@@ -104,7 +104,7 @@ export const mockCctvDetectionsByItemId: Record<number, CctvDetection[]> = {
             moment_snapshot_url: "https://picsum.photos/seed/moment303/400/300",
         },
         {
-            detection_id: 304,
+            match_id: 304,
             score: 0.65,
             detected_at: "2026-05-15T16:20:00",
             building_name: "체육관",
@@ -113,7 +113,7 @@ export const mockCctvDetectionsByItemId: Record<number, CctvDetection[]> = {
             moment_snapshot_url: "https://picsum.photos/seed/moment304/400/300",
         },
         {
-            detection_id: 305,
+            match_id: 305,
             score: 0.58,
             detected_at: "2026-05-16T07:50:00",
             building_name: "정문",

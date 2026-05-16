@@ -16,9 +16,9 @@ export const cctvService = {
             {params: {itemId}}
         ),
 
-    reviewDetection: (detectionId: number, body: CctvReviewRequest) =>
+    reviewDetection: (matchId: number, body: CctvReviewRequest) =>
         axiosInstance.put<ApiResponse<null>>(
-            `/api/cctv/detections/${detectionId}/review`,
+            `/api/cctv/detections/${matchId}/review`,
             body
         ),
 };
