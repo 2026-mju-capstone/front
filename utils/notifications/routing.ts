@@ -7,21 +7,25 @@ const ROUTING_REGISTRY: Record<string, (data: NotificationData) => Href> = {
         pathname: ROUTES.CHAT_ROOM,
         params: { roomId: Number(data.room_id) }
     }),
-    ITEM_RETURNED: (data) => ({
-        pathname: ROUTES.LOST_ITEM_DETAIL,
-        params: { id: Number(data.item_post_id) }
+    ITEM_RETURNED: () => ({
+        pathname: ROUTES.CHAT,
+        params: {}
     }),
     MATCH_FOUND: () => ({
         pathname: ROUTES.MATCHES,
         params: {}
     }),
-    THEFT_SUSPECTED: () => ({
+    THEFT_SUSPECTED: (data) => ({
         pathname: ROUTES.CCTV_RESULT,
-        params: {}
+        params: { itemId: Number(data.item_id) }
     }),
     LOCKER_READY: () => ({
-        pathname: ROUTES.MYPAGE,
+        pathname: ROUTES.SCAN,
         params: {}
+    }),
+    CCTV_FOUND: (data) => ({
+        pathname: ROUTES.CCTV_RESULT,
+        params: { itemId: Number(data.item_id) }
     })
 }
 
