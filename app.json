@@ -58,6 +58,17 @@
         {
           "cameraPermission": "카메라로 분실물 사진을 촬영합니다."
         }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "kotlinVersion": "1.9.24",
+            "compileSdkVersion": 35,
+            "targetSdkVersion": 34,
+            "buildToolsVersion": "35.0.0"
+          }
+        }
       ]
     ],
     "experiments": {
