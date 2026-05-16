@@ -3,7 +3,7 @@ import { useCctvMutations } from "@/hooks/mutations/useCctvMutations";
 import { useCctvQueries } from "@/hooks/queries/useCctvQueries";
 import { fonts } from "@/constants/typography";
 import { CctvDetection, CctvReviewStatus } from "@/api/types";
-import { mockCctvDetectionsByItemId } from "@/mocks/cctv"; // TODO(mock): 실서버 연동 시 이 줄 삭제
+// import { mockCctvDetectionsByItemId } from "@/mocks/cctv";
 import { Camera, CheckCircle2, ChevronLeft, Clock, HelpCircle, MapPin, Phone, Video, XCircle } from "lucide-react-native";
 import { useState } from "react";
 import {
@@ -13,9 +13,6 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Toast from "react-native-toast-message";
 import { useLocalSearchParams, useRouter } from "expo-router";
-
-// TODO(mock): 실서버 연동 시 아래 한 줄 삭제
-const USE_MOCK = true;
 
 const { width: screenWidth } = Dimensions.get("window");
 const SNAPSHOT_WIDTH = (screenWidth - 32) / 2;
@@ -82,8 +79,9 @@ export default function CctvResultScreen() {
         );
     };
 
-    // TODO(mock): 실서버 연동 시 → if (isLoading) {
-    if (!USE_MOCK && isLoading) {
+    // const USE_MOCK = true;
+    // if (!USE_MOCK && isLoading) {
+    if (isLoading) {
         return (
             <View style={[styles.container, { alignItems: "center", justifyContent: "center" }]}>
                 <ActivityIndicator color="#ef4444" size="large" />
@@ -91,10 +89,8 @@ export default function CctvResultScreen() {
         );
     }
 
-    // TODO(mock): 실서버 연동 시 → responseData?.detections ?? []
-    const detections = USE_MOCK
-        ? (mockCctvDetectionsByItemId[parsedItemId] ?? [])
-        : (responseData?.detections ?? []);
+    // const detections = USE_MOCK ? (mockCctvDetectionsByItemId[parsedItemId] ?? []) : (responseData?.detections ?? []);
+    const detections = responseData?.detections ?? [];
 
     return (
         <View style={[styles.container, { paddingTop: insets.top }]}>
