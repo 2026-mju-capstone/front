@@ -1,5 +1,5 @@
 export const BASE_URL =
-  process.env.EXPO_PUBLIC_BASE_URL ?? "https://lalaalal.com";
+    process.env.EXPO_PUBLIC_BASE_URL ?? "https://lalaalal.com";
 
 // Auth
 export const REGISTER_URL = BASE_URL + "/api/auth/device-token";
@@ -37,25 +37,30 @@ export const ITEM_CATEGORIES_URL = BASE_URL + "/api/metadata/item-categories";
 // Images
 export const IMAGE_UPLOAD_URL = BASE_URL + "/api/images/upload";
 
+export const CCTV_DETECTIONS_URL = BASE_URL + "/api/cctv/detections/me";
+export const CCTV_REVIEW_URL = (detectionId: number): string =>
+    BASE_URL + `/api/cctv/detections/${detectionId}/review`;
+
 // App Routes (Navigation)
 export const ROUTES = {
-  HOME: "/",
-  LOGIN: "/(auth)/login",
-  SIGNUP: "/(auth)/signup/email",
-  SIGNUP_VERIFY: "/(auth)/signup/verify",
-  SIGNUP_PASSWORD: "/(auth)/signup/password",
-  SIGNUP_PROFILE: "/(auth)/signup/profile",
-  LOST_ITEM_BOARD: "/(tabs)/lost-item",
-  LOST_ITEM_REGISTER: "/lost-item-register",
-  LOST_ITEM_DETAIL: "/lost-item-detail",
-  CHAT: "/(tabs)/chat",
-  CHAT_ROOM: "/chat-room",
-  MAP: "/(tabs)/map",
-  MYPAGE: "/(tabs)/mypage",
-  SCAN: "/(tabs)/scan",
-  LOADING: "/loading",
-  NOTIFICATION: "/notifications",
-  MATCHES: "/matches",
-  MY_QR: "/my-qr",
-  CCTV_RESULT: "/cctv-result",
+    HOME: "/",
+    LOGIN: "/(auth)/login",
+    SIGNUP: "/(auth)/signup/email",
+    SIGNUP_VERIFY: "/(auth)/signup/verify",
+    SIGNUP_PASSWORD: "/(auth)/signup/password",
+    SIGNUP_PROFILE: "/(auth)/signup/profile",
+    LOST_ITEM_BOARD: "/(tabs)/lost-item",
+    LOST_ITEM_REGISTER: "/lost-item-register",
+    LOST_ITEM_DETAIL: "/lost-item-detail",
+    CHAT: "/(tabs)/chat",
+    CHAT_ROOM: "/chat-room",
+    MAP: "/(tabs)/map",
+    MYPAGE: "/(tabs)/mypage",
+    SCAN: "/(tabs)/scan",
+    LOADING: "/loading",
+    NOTIFICATION: "/notifications",
+    MATCHES: "/matches",
+    MY_QR: "/my-qr",
+    CCTV_RESULT: "/cctv-result",
+    CCTV_ITEMS: "/cctv-items",
 } as const;

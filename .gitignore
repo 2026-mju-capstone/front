@@ -44,6 +44,6 @@ app-example
 
 google-services.json
 .env
-
+.claude/
 GEMINI.md
 CLAUDE.md

@@ -142,6 +142,7 @@ function RootLayoutNav() {
         <Stack.Screen name="notifications" options={{ headerShown: false }} />
         <Stack.Screen name="matches" options={{ headerShown: false }} />
         <Stack.Screen name="my-qr" options={{ headerShown: false }} />
+        <Stack.Screen name="cctv-items" options={{ headerShown: false }} />
         <Stack.Screen name="cctv-result" options={{ headerShown: false }} />
       </Stack>
       <GlobalLoading />
