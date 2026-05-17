@@ -90,24 +90,31 @@ export default function MapScreen() {
   useEffect(() => {
     let subscription: Location.LocationSubscription | null = null;
     (async () => {
-      await Location.requestForegroundPermissionsAsync();
-      const location = await Location.getCurrentPositionAsync({});
-      setUserLocation({
-        lat: location.coords.latitude,
-        lng: location.coords.longitude,
-      });
-      subscription = await Location.watchPositionAsync(
-        {
-          accuracy: Location.Accuracy.High,
-          timeInterval: 3000,
-          distanceInterval: 5,
-        },
-        (loc) =>
-          setUserLocation({
-            lat: loc.coords.latitude,
-            lng: loc.coords.longitude,
-          }),
-      );
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== "granted") return;
+
+        const location = await Location.getCurrentPositionAsync({});
+        setUserLocation({
+          lat: location.coords.latitude,
+          lng: location.coords.longitude,
+        });
+
+        subscription = await Location.watchPositionAsync(
+          {
+            accuracy: Location.Accuracy.High,
+            timeInterval: 3000,
+            distanceInterval: 5,
+          },
+          (loc) =>
+            setUserLocation({
+              lat: loc.coords.latitude,
+              lng: loc.coords.longitude,
+            }),
+        );
+      } catch (e) {
+        console.warn("[Map] location unavailable", e);
+      }
     })();
     return () => {
       subscription?.remove();

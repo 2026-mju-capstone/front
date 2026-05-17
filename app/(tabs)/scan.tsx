@@ -1,4 +1,4 @@
-import axiosInstance from "@/api/client";
+import { lockerService } from "@/api/services/locker";
 import { fonts } from "@/constants/typography";
 import { ROUTES } from "@/constants/url";
 import { CameraView, useCameraPermissions } from "expo-camera";
@@ -15,7 +15,7 @@ import {
   User,
   X,
 } from "lucide-react-native";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Alert,
   Linking,
@@ -46,7 +46,16 @@ export default function QRScanScreen() {
   const [modalType, setModalType] = useState<ModalType>(null);
   const [ownerInfo, setOwnerInfo] = useState<OwnerInfo | null>(null);
   const [lockerId, setLockerId] = useState<number | null>(null);
+  const [lockerErrorMsg, setLockerErrorMsg] = useState<string>("");
+  const [lockerReady, setLockerReady] = useState(false);
   const isProcessing = useRef(false);
+
+  useEffect(() => {
+    if (modalType !== "locker_success") return;
+    setLockerReady(false);
+    const t = setTimeout(() => setLockerReady(true), 3000);
+    return () => clearTimeout(t);
+  }, [modalType]);
 
   const handleScanStart = async () => {
     if (!permission?.granted) {
@@ -80,22 +89,12 @@ export default function QRScanScreen() {
         const id = Number(lockerMatch[1]);
         setLockerId(id);
 
-        if (!itemIdParam) {
-          Alert.alert(
-            "물품 정보 없음",
-            "분실물을 먼저 등록하고 '사물함에 넣기'를 선택해주세요.",
-          );
-          isProcessing.current = false;
-          return;
-        }
-
         try {
-          await axiosInstance.post(`/api/lockers/${id}/unlock`, {
-            itemId: Number(itemIdParam),
-          });
+          await lockerService.unlock(id, itemIdParam ? Number(itemIdParam) : undefined);
           setModalType("locker_success");
         } catch (e: any) {
           if (e.response?.status === 403) {
+            setLockerErrorMsg(e.response?.data?.error ?? "권한이 없습니다.");
             setModalType("locker_fail");
           } else {
             const serverMsg: string | undefined = e.response?.data?.error;
@@ -112,12 +111,11 @@ export default function QRScanScreen() {
       if (parsed.type === "locker" && parsed.lockerId) {
         setLockerId(parsed.lockerId);
         try {
-          await axiosInstance.post(`/api/lockers/${parsed.lockerId}/unlock`, {
-            itemId: parsed.itemId ?? null,
-          });
+          await lockerService.unlock(parsed.lockerId, parsed.itemId ?? undefined);
           setModalType("locker_success");
         } catch (e: any) {
           if (e.response?.status === 403) {
+            setLockerErrorMsg(e.response?.data?.error ?? "권한이 없습니다.");
             setModalType("locker_fail");
           } else {
             const serverMsg: string | undefined = e.response?.data?.error;
@@ -194,7 +192,7 @@ export default function QRScanScreen() {
   const handleLockerClose = async () => {
     if (lockerId) {
       try {
-        await axiosInstance.post(`/api/lockers/${lockerId}/lock`);
+        await lockerService.lock(lockerId);
       } catch (e) {
         console.error("사물함 닫기 실패", e);
       }
@@ -379,11 +377,14 @@ export default function QRScanScreen() {
             </View>
             <Text style={styles.modalTitle}>사물함이 열렸어요!</Text>
             <Text style={styles.modalDesc}>
-              물건을 사물함에 넣은 후{"\n"}아래 버튼을 눌러 닫아주세요.
+              {itemIdParam
+                ? `물건을 사물함에 넣은 후\n아래 버튼을 눌러 닫아주세요.`
+                : `물건을 꺼낸 후\n아래 버튼을 눌러 닫아주세요.`}
             </Text>
             <TouchableOpacity
-              style={styles.lockerCloseBtn}
+              style={[styles.lockerCloseBtn, !lockerReady && { opacity: 0.45 }]}
               onPress={handleLockerClose}
+              disabled={!lockerReady}
               activeOpacity={0.85}
             >
               <LinearGradient
@@ -392,7 +393,11 @@ export default function QRScanScreen() {
                 end={{ x: 1, y: 1 }}
                 style={styles.lockerCloseBtnGradient}
               >
-                <Text style={styles.lockerCloseBtnText}>넣었어요, 닫기</Text>
+                <Text style={styles.lockerCloseBtnText}>
+                  {lockerReady
+                    ? (itemIdParam ? "넣었어요, 닫기" : "꺼냈어요, 닫기")
+                    : "사물함 열리는 중..."}
+                </Text>
               </LinearGradient>
             </TouchableOpacity>
           </View>
@@ -415,10 +420,7 @@ export default function QRScanScreen() {
               <X size={32} color="#f87171" />
             </View>
             <Text style={styles.modalTitle}>권한이 없습니다</Text>
-            <Text style={styles.modalDesc}>
-              이 사물함을 열 수 있는 권한이 없어요.{"\n"}
-              물품 소유자 또는 습득자만 접근할 수 있습니다.
-            </Text>
+            <Text style={styles.modalDesc}>{lockerErrorMsg}</Text>
             <TouchableOpacity
               style={styles.closeTextBtn}
               onPress={() => setModalType(null)}
