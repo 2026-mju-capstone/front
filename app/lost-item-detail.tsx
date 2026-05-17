@@ -10,6 +10,7 @@ import { fonts } from "@/constants/typography";
 import { BASE_URL } from "@/constants/url";
 import { useChatMutations } from "@/hooks/mutations/useChatMutations";
 import { useItemQueries } from "@/hooks/queries/useItemQueries";
+import { useMetadataQueries } from "@/hooks/queries/useMetadataQueries";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
   AlertTriangle,
@@ -56,6 +57,8 @@ export default function LostItemDetail() {
 
   const { data: response, isLoading } = useItemQueries.useItemDetail(id!);
   const createChatRoomMutation = useChatMutations.useCreateChatRoom();
+  const { data: buildingsRes } = useMetadataQueries.useBuildings();
+  const apiBuildings = buildingsRes?.data?.data ?? [];
 
   const item = response?.success ? response.data : null;
 
@@ -106,10 +109,11 @@ export default function LostItemDetail() {
 
   const handleShare = async () => {
     if (!item) return;
-    const building = BASE_BUILDINGS.find((b) => b.id === item.building_id);
+    const sharedBuildingName =
+      apiBuildings.find((b) => b.id === item.building_id)?.name ?? "";
     const locationText = item.data_address
-      ? `${building?.name} · ${item.data_address}`
-      : (building?.name ?? "");
+      ? `${sharedBuildingName} · ${item.data_address}`
+      : sharedBuildingName;
     try {
       await Share.share({
         message: `[줍픽] ${item.title ?? "분실물"} - ${locationText}`,
@@ -177,11 +181,12 @@ export default function LostItemDetail() {
   const statusStyle = (isTheftConfirmed
     ? ITEM_STATUS_STYLE.THEFT_CONFIRMED
     : ITEM_STATUS_STYLE[item.type]) ?? { bg: "#f3f4f6", text: "#888" };
-  const building = BASE_BUILDINGS.find((b) => b.id === item.building_id);
-  const buildingName = building?.name ?? "";
+  const buildingName =
+    apiBuildings.find((b) => b.id === item.building_id)?.name ?? "";
   const detailLocation = item.data_address ?? "";
-  const lat = building?.lat;
-  const lng = building?.lng;
+  const coordBuilding = BASE_BUILDINGS.find((b) => b.name === buildingName);
+  const lat = coordBuilding?.lat;
+  const lng = coordBuilding?.lng;
   const hasLocation = lat != null && lng != null;
 
   const mapHTML = hasLocation

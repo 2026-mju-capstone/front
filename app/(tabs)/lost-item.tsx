@@ -10,6 +10,7 @@ import {
 import { fonts } from "@/constants/typography";
 import { BASE_URL, ROUTES } from "@/constants/url";
 import { useItemQueries } from "@/hooks/queries/useItemQueries";
+import { useMetadataQueries } from "@/hooks/queries/useMetadataQueries";
 import { useRouter } from "expo-router";
 import {
   Bell,
@@ -88,6 +89,9 @@ export default function LostItemBoard() {
     refetch,
   } = useItemQueries.useInfiniteItems(20, filterBody);
 
+  const { data: buildingsRes } = useMetadataQueries.useBuildings();
+  const apiBuildings = buildingsRes?.data?.data ?? [];
+
   const items = useMemo(() => {
     return (
       data?.pages.flatMap((page) =>
@@ -102,7 +106,7 @@ export default function LostItemBoard() {
         .filter((item) => {
           const korCategory = CATEGORY_MAP[item.category] ?? "기타";
           const buildingName =
-            BASE_BUILDINGS.find((b) => b.id === item.building_id)?.name ?? "";
+            apiBuildings.find((b) => b.id === item.building_id)?.name ?? "";
           const matchType =
             typeFilter === "전체" ||
             (typeFilter === "찾는중" && item.type === "LOST") ||
@@ -123,7 +127,7 @@ export default function LostItemBoard() {
             new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
         )
     );
-  }, [items, typeFilter, category, searchQuery]);
+  }, [items, typeFilter, category, searchQuery, apiBuildings]);
 
   const closeDropdowns = () => {
     setShowStatusDropdown(false);
@@ -340,7 +344,7 @@ export default function LostItemBoard() {
                 : ITEM_STATUS_STYLE[item.type]) ?? { dot: "#aaa" };
               const IconComponent = CATEGORY_ICON_MAP[item.category] ?? Package;
               const buildingName =
-                BASE_BUILDINGS.find((b) => b.id === item.building_id)?.name ??
+                apiBuildings.find((b) => b.id === item.building_id)?.name ??
                 "";
               const locationText = item.data_address
                 ? `${buildingName} · ${item.data_address}`
