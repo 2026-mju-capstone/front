@@ -194,10 +194,9 @@ export default function MyPageScreen() {
           </TouchableOpacity>
 
           {/* CCTV 분석 카드 */}
-          {/* TODO: PM 작업 예정 - router.push(ROUTES.CCTV_RESULT) 로 변경 */}
           <TouchableOpacity
             className="flex-1 bg-white rounded-3xl p-4 border border-gray-100 shadow-sm overflow-hidden"
-            onPress={() => router.push(ROUTES.CCTV_RESULT)}
+            onPress={() => router.push(ROUTES.CCTV_ITEMS)}
             activeOpacity={0.85}
           >
             <View className="w-11 h-11 rounded-2xl bg-red-400 items-center justify-center mb-3">
