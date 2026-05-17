@@ -46,9 +46,15 @@ export function useChatSocket(roomId: number, enabled: boolean = true) {
 
   const isFocusedRef = useRef(false);
   const pendingReadRef = useRef(false);
+  const profileNicknameRef = useRef<string | undefined>(undefined);
   const [status, setStatus] = useState<ConnectionStatus>("DISCONNECTED");
   // isConnected를 React state로 관리 → 연결 상태 변화 시 리렌더링 트리거
   const [isConnected, setIsConnected] = useState(false);
+
+  // profile이 바뀔 때마다 ref 동기화 (onMessage 콜백의 stale closure 방지)
+  useEffect(() => {
+    profileNicknameRef.current = profile?.nickname;
+  }, [profile?.nickname]);
 
   useFocusEffect(
     useCallback(() => {
@@ -80,7 +86,7 @@ export function useChatSocket(roomId: number, enabled: boolean = true) {
             (old) => {
               if (!old?.data) return old;
 
-              const isMine = sender_nickname === profile?.nickname;
+              const isMine = sender_nickname === profileNicknameRef.current;
               if (isMine) return old;
 
               const newMessage: MessageRecord = {

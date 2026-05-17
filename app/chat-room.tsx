@@ -229,7 +229,7 @@ export default function ChatRoomScreen() {
 
   const { data: profile } = useProfile();
   const { data: roomData, isLoading: isRoomLoading } =
-    useChatQueries.useChatRoom(roomIdNum);
+    useChatQueries.useChatRoom(roomIdNum, true);
   const { data: messagesData, isLoading: isMessagesLoading } =
     useChatQueries.useMessages(roomIdNum, false);
 
@@ -248,10 +248,10 @@ export default function ChatRoomScreen() {
   const reopenChatRoomMutation = useChatMutations.useReopenChatRoom(roomIdNum);
 
   const chatRoom = roomData?.success ? roomData.data : null;
-  const counterpartNickname =
-    profile?.nickname === chatRoom?.owner_nickname
-      ? chatRoom?.finder_nickname
-      : chatRoom?.owner_nickname;
+  const isOwner = profile?.nickname === chatRoom?.owner_nickname;
+  const counterpartNickname = isOwner
+    ? chatRoom?.finder_nickname
+    : chatRoom?.owner_nickname;
   const messages = messagesData?.success ? messagesData.data.messages : [];
   const isClosed = chatRoom?.status !== "OPEN";
   const isLoading = isRoomLoading || isMessagesLoading;
@@ -334,7 +334,9 @@ export default function ChatRoomScreen() {
             type: "success",
             text1:
               reason === "RETURNED"
-                ? "반환 완료 처리되었어요"
+                ? isOwner
+                  ? "반환 완료 처리되었어요"
+                  : "반환 완료로 처리되었어요"
                 : "거래가 종료되었어요",
             position: "bottom",
             visibilityTime: 2500,
@@ -575,7 +577,9 @@ export default function ChatRoomScreen() {
               style={styles.modalBtn}
               onPress={() => handleClose("RETURNED")}
             >
-              <Text style={styles.modalBtnText}>✅ 물건을 돌려받았어요</Text>
+              <Text style={styles.modalBtnText}>
+                {isOwner ? "✅ 물건을 돌려받았어요" : "✅ 물건을 찾아줬어요"}
+              </Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.modalBtn, styles.modalBtnGray]}
