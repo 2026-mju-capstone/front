@@ -362,7 +362,7 @@ export default function QRScanScreen() {
         </View>
       </Modal>
 
-      {/* 보관완료 모달 */}
+      {/* 사물함 열림 모달 — 물건 넣은 후 닫기 */}
       <Modal
         visible={modalType === "locker_success"}
         transparent
@@ -370,16 +370,16 @@ export default function QRScanScreen() {
       >
         <Pressable
           style={styles.modalOverlay}
-          onPress={() => setModalType(null)}
+          onPress={() => {}}
         />
         <View style={styles.modalWrap}>
           <View style={styles.modalCard}>
             <View style={styles.successIconWrap}>
               <Archive size={32} color="#fff" />
             </View>
-            <Text style={styles.modalTitle}>보관 완료!</Text>
+            <Text style={styles.modalTitle}>사물함이 열렸어요!</Text>
             <Text style={styles.modalDesc}>
-              물건이 사물함에 안전하게 보관되었어요.
+              물건을 사물함에 넣은 후{"\n"}아래 버튼을 눌러 닫아주세요.
             </Text>
             <TouchableOpacity
               style={styles.lockerCloseBtn}
@@ -392,7 +392,7 @@ export default function QRScanScreen() {
                 end={{ x: 1, y: 1 }}
                 style={styles.lockerCloseBtnGradient}
               >
-                <Text style={styles.lockerCloseBtnText}>사물함 닫기</Text>
+                <Text style={styles.lockerCloseBtnText}>넣었어요, 닫기</Text>
               </LinearGradient>
             </TouchableOpacity>
           </View>
