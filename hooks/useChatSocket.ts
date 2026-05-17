@@ -60,10 +60,10 @@ export function useChatSocket(roomId: number, enabled: boolean = true) {
     useCallback(() => {
       isFocusedRef.current = true;
 
-      if (pendingReadRef.current && chatSocket.isConnected()) {
+      if (chatSocket.isConnected()) {
         chatSocket.sendRead(roomId);
-        pendingReadRef.current = false;
       }
+      pendingReadRef.current = false;
 
       return () => {
         isFocusedRef.current = false;
@@ -135,7 +135,10 @@ export function useChatSocket(roomId: number, enabled: boolean = true) {
       // ── onStatus: 연결 상태 변화 시 state 업데이트 ──
       (newStatus) => {
         setStatus(newStatus);
-        setIsConnected(newStatus === "CONNECTED"); // 추가!
+        setIsConnected(newStatus === "CONNECTED");
+        if (newStatus === "CONNECTED" && isFocusedRef.current) {
+          chatSocket.sendRead(roomId);
+        }
       },
       // ── onError ──
       (reason, message) => {
