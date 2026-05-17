@@ -97,10 +97,21 @@ export interface Course {
   courseId: number;
   courseName: string;
   roomName: string;
+  buildingId: number;
   buildingName: string;
   buildingCode: string;
   color?: string;
   schedules: CourseSchedule[];
+}
+
+export interface BuildingRecord {
+  id: number;
+  name: string;
+}
+
+export interface RoomRecord {
+  id: number;
+  name: string;
 }
 
 export interface TimetableSummary {

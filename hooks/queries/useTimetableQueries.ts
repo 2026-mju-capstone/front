@@ -14,6 +14,7 @@ export const usePrimaryTimetable = () => {
         queryKey: timetableKeys.primary(),
         queryFn: () => timetableService.getPrimaryTimetable(),
         staleTime: 0,
+        retry: false,
     });
 };
 
