@@ -1,5 +1,6 @@
 import { fonts } from "@/constants/typography";
 import { BASE_URL, ROUTES } from "@/constants/url";
+import { useChatMutations } from "@/hooks/mutations/useChatMutations";
 import { useMatchMutations } from "@/hooks/mutations/useMatchMutations";
 import { useMatchQueries } from "@/hooks/queries/useMatchQueries";
 import { useRouter } from "expo-router";
@@ -8,6 +9,7 @@ import {
   Building2,
   CheckCircle2,
   ChevronLeft,
+  MessageCircle,
   Sparkles,
   XCircle,
 } from "lucide-react-native";
@@ -32,17 +34,20 @@ export default function MatchesScreen() {
   const insets = useSafeAreaInsets();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
-  const [modalType, setModalType] = useState<"confirm" | "reject" | null>(null);
+  const [modalType, setModalType] = useState<"reject" | null>(null);
+  const [acceptedIds, setAcceptedIds] = useState<string[]>([]);
 
   const { data, isLoading, refetch } = useMatchQueries.useMyMatches();
   const confirmMutation = useMatchMutations.useConfirmMatch();
   const rejectMutation = useMatchMutations.useRejectMatch();
+  const createChatRoomMutation = useChatMutations.useCreateChatRoom();
 
   const matches = data?.success ? data.data : [];
-  // CANDIDATE / NOTIFIED 만 노출 (이미 처리한 건 제외)
-  const pendingMatches = matches.filter(
-    (m) => m.status === "CANDIDATE" || m.status === "NOTIFIED",
-  );
+
+  const pendingMatches = matches
+    .filter((m) => m.status === "CANDIDATE" || m.status === "NOTIFIED")
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 5);
 
   const onRefresh = async () => {
     setIsRefreshing(true);
@@ -50,9 +55,9 @@ export default function MatchesScreen() {
     setIsRefreshing(false);
   };
 
-  const openModal = (matchId: string, type: "confirm" | "reject") => {
+  const openRejectModal = (matchId: string) => {
     setSelectedMatchId(matchId);
-    setModalType(type);
+    setModalType("reject");
   };
 
   const closeModal = () => {
@@ -60,19 +65,68 @@ export default function MatchesScreen() {
     setModalType(null);
   };
 
-  const handleConfirm = () => {
-    if (!selectedMatchId) return;
-    const id = Number(selectedMatchId);
-    closeModal();
+  const handleConfirm = (matchId: string, foundItemId: number) => {
+    const id = Number(matchId);
     confirmMutation.mutate(id, {
-      onSuccess: () => {
-        Toast.show({
-          type: "success",
-          text1: "매칭이 성사되었어요!",
-          text2: "회수 절차를 진행해주세요.",
-          position: "bottom",
-          visibilityTime: 2500,
-        });
+      onSuccess: (res) => {
+        if (!res.success) {
+          Toast.show({
+            type: "error",
+            text1: "매칭 수락 실패",
+            text2: "다시 시도해주세요.",
+            position: "bottom",
+            visibilityTime: 2500,
+          });
+          return;
+        }
+
+        const { match_type, counterpart_id, locker_id } = res.data;
+        setAcceptedIds((prev) => [...prev, matchId]);
+
+        if (match_type === "CHAT") {
+          createChatRoomMutation.mutate(
+            {
+              item_id: foundItemId,
+              counterpart_id,
+            },
+            {
+              onSuccess: (chatRes) => {
+                if (chatRes.success && chatRes.data.room_data) {
+                  Toast.show({
+                    type: "success",
+                    text1: "매칭이 성사되었어요!",
+                    text2: "채팅으로 약속을 잡아보세요.",
+                    position: "bottom",
+                    visibilityTime: 2500,
+                  });
+                  router.push({
+                    pathname: "/chat-room",
+                    params: { roomId: chatRes.data.room_data.room_id },
+                  });
+                }
+              },
+              onError: () => {
+                Toast.show({
+                  type: "error",
+                  text1: "채팅방 생성 실패",
+                  text2: "다시 시도해주세요.",
+                  position: "bottom",
+                  visibilityTime: 2500,
+                });
+              },
+            },
+          );
+        } else {
+          Toast.show({
+            type: "success",
+            text1: "매칭이 성사되었어요!",
+            text2: "사물함에서 물건을 회수해주세요.",
+            position: "bottom",
+            visibilityTime: 2500,
+          });
+          // TODO: locker_id로 사물함 안내 화면 이동
+          // router.push({ pathname: ROUTES.SCAN, params: { lockerId: locker_id } });
+        }
       },
       onError: () => {
         Toast.show({
@@ -125,12 +179,11 @@ export default function MatchesScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      {/* 헤더 */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
           <ChevronLeft size={22} color="#333" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>매칭 후보</Text>
+        <Text style={styles.headerTitle}>AI 매칭 결과</Text>
         <View style={{ width: 36 }} />
       </View>
 
@@ -155,10 +208,10 @@ export default function MatchesScreen() {
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.introTitle}>
-                  분실물과 유사한 습득물을 발견했어요
+                  분실물과 유사한 습득물 {pendingMatches.length}개를 발견했어요
                 </Text>
                 <Text style={styles.introDesc}>
-                  확인하고 내 물건이 맞다면 수락해주세요
+                  유사도 높은 순으로 최대 5개를 보여드려요
                 </Text>
               </View>
             </View>
@@ -182,18 +235,11 @@ export default function MatchesScreen() {
               : `${BASE_URL}${item.found_image_url}`
             : null;
           const scorePercent = Math.round(item.score * 100);
+          const isAccepted = acceptedIds.includes(item.match_id);
+          const isConfirming = confirmMutation.isPending;
 
           return (
             <View style={styles.card}>
-              {/* 상단 점수 배지 */}
-              <View style={styles.scoreRow}>
-                <View style={styles.scoreBadge}>
-                  <Award size={12} color="#6366f1" />
-                  <Text style={styles.scoreText}>유사도 {scorePercent}%</Text>
-                </View>
-              </View>
-
-              {/* 이미지 */}
               <TouchableOpacity
                 activeOpacity={0.85}
                 onPress={() =>
@@ -203,20 +249,37 @@ export default function MatchesScreen() {
                   })
                 }
               >
-                {imageUrl ? (
-                  <Image
-                    source={{ uri: imageUrl }}
-                    style={styles.image}
-                    resizeMode="cover"
-                  />
-                ) : (
-                  <View style={styles.imagePlaceholder}>
-                    <Sparkles size={32} color="#6366f1" />
+                <View style={styles.imageWrap}>
+                  {imageUrl ? (
+                    <Image
+                      source={{ uri: imageUrl }}
+                      style={styles.image}
+                      resizeMode="cover"
+                    />
+                  ) : (
+                    <View style={styles.imagePlaceholder}>
+                      <Sparkles size={32} color="#6366f1" />
+                    </View>
+                  )}
+                  <View style={styles.scoreBadgeOverlay}>
+                    <Award size={11} color="#fff" />
+                    <Text style={styles.scoreBadgeText}>
+                      유사도 {scorePercent}%
+                    </Text>
                   </View>
-                )}
+                  {isAccepted && (
+                    <View style={styles.acceptedOverlay}>
+                      <View style={styles.acceptedBadge}>
+                        <CheckCircle2 size={16} color="#10b981" />
+                        <Text style={styles.acceptedBadgeText}>
+                          매칭 수락됨
+                        </Text>
+                      </View>
+                    </View>
+                  )}
+                </View>
               </TouchableOpacity>
 
-              {/* 정보 */}
               <View style={styles.info}>
                 <Text style={styles.title} numberOfLines={1}>
                   {item.found_post_title}
@@ -229,63 +292,87 @@ export default function MatchesScreen() {
                     </Text>
                   </View>
                 ) : null}
-                <Text style={styles.finder}>
-                  습득자: {item.found_nickname}
-                  {item.found_department ? ` · ${item.found_department}` : ""}
-                </Text>
+                <View style={styles.finderBox}>
+                  <View style={styles.finderAvatar}>
+                    <Text style={styles.finderAvatarText}>
+                      {item.found_nickname?.charAt(0) ?? "?"}
+                    </Text>
+                  </View>
+                  <View>
+                    <Text style={styles.finderName}>{item.found_nickname}</Text>
+                    {item.found_department ? (
+                      <Text style={styles.finderDept}>
+                        {item.found_department}
+                      </Text>
+                    ) : null}
+                  </View>
+                </View>
               </View>
 
-              {/* 버튼 */}
               <View style={styles.btnRow}>
-                <TouchableOpacity
-                  style={styles.rejectBtn}
-                  onPress={() => openModal(item.match_id, "reject")}
-                  activeOpacity={0.85}
-                >
-                  <XCircle size={16} color="#888" />
-                  <Text style={styles.rejectBtnText}>내 거 아니에요</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.confirmBtn}
-                  onPress={() => openModal(item.match_id, "confirm")}
-                  activeOpacity={0.85}
-                >
-                  <CheckCircle2 size={16} color="#fff" />
-                  <Text style={styles.confirmBtnText}>내 물건이에요</Text>
-                </TouchableOpacity>
+                {isAccepted ? (
+                  <TouchableOpacity
+                    style={styles.chatBtn}
+                    onPress={() => router.push(ROUTES.CHAT)}
+                    activeOpacity={0.85}
+                  >
+                    <MessageCircle size={16} color="#fff" />
+                    <Text style={styles.chatBtnText}>채팅으로 연락하기</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <>
+                    <TouchableOpacity
+                      style={styles.rejectBtn}
+                      onPress={() => openRejectModal(item.match_id)}
+                      activeOpacity={0.85}
+                      disabled={isConfirming}
+                    >
+                      <XCircle size={16} color="#888" />
+                      <Text style={styles.rejectBtnText}>내 거 아니에요</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[
+                        styles.confirmBtn,
+                        isConfirming && { opacity: 0.6 },
+                      ]}
+                      onPress={() =>
+                        handleConfirm(item.match_id, item.found_item_id)
+                      }
+                      activeOpacity={0.85}
+                      disabled={isConfirming}
+                    >
+                      {isConfirming ? (
+                        <ActivityIndicator size="small" color="#fff" />
+                      ) : (
+                        <>
+                          <CheckCircle2 size={16} color="#fff" />
+                          <Text style={styles.confirmBtnText}>
+                            내 물건이에요
+                          </Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
+                  </>
+                )}
               </View>
             </View>
           );
         }}
       />
 
-      {/* 확인 모달 */}
-      <Modal visible={modalType !== null} transparent animationType="fade">
+      <Modal visible={modalType === "reject"} transparent animationType="fade">
         <Pressable style={styles.modalOverlay} onPress={closeModal} />
         <View style={styles.modalWrap}>
           <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>
-              {modalType === "confirm"
-                ? "매칭을 수락하시겠어요?"
-                : "매칭을 거절하시겠어요?"}
-            </Text>
+            <Text style={styles.modalTitle}>매칭을 거절하시겠어요?</Text>
             <Text style={styles.modalDesc}>
-              {modalType === "confirm"
-                ? "수락하면 회수 절차가 진행되며,\n취소할 수 없어요."
-                : "거절한 매칭은 다시 받을 수 없어요."}
+              거절한 매칭은 다시 받을 수 없어요.
             </Text>
             <TouchableOpacity
-              style={[
-                styles.modalBtn,
-                modalType === "confirm"
-                  ? styles.modalBtnPrimary
-                  : styles.modalBtnDanger,
-              ]}
-              onPress={modalType === "confirm" ? handleConfirm : handleReject}
+              style={[styles.modalBtn, styles.modalBtnDanger]}
+              onPress={handleReject}
             >
-              <Text style={styles.modalBtnText}>
-                {modalType === "confirm" ? "수락하기" : "거절하기"}
-              </Text>
+              <Text style={styles.modalBtnText}>거절하기</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.cancelBtn} onPress={closeModal}>
               <Text style={styles.cancelBtnText}>취소</Text>
@@ -357,22 +444,7 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 2,
   },
-  scoreRow: {
-    flexDirection: "row",
-    paddingHorizontal: 14,
-    paddingTop: 14,
-    paddingBottom: 8,
-  },
-  scoreBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    backgroundColor: "#eef2ff",
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 12,
-  },
-  scoreText: { fontSize: 11, fontFamily: fonts.bold, color: "#6366f1" },
+  imageWrap: { position: "relative" },
   image: { width: "100%", height: 200, backgroundColor: "#f5f6f8" },
   imagePlaceholder: {
     width: "100%",
@@ -381,11 +453,68 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  info: { paddingHorizontal: 14, paddingTop: 12, paddingBottom: 14, gap: 4 },
+  scoreBadgeOverlay: {
+    position: "absolute",
+    top: 12,
+    left: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "rgba(0,0,0,0.55)",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 20,
+  },
+  scoreBadgeText: { fontSize: 11, fontFamily: fonts.bold, color: "#fff" },
+  acceptedOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  acceptedBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "#fff",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
+  },
+  acceptedBadgeText: { fontSize: 14, fontFamily: fonts.bold, color: "#111" },
+  info: { paddingHorizontal: 14, paddingTop: 12, paddingBottom: 14, gap: 6 },
   title: { fontSize: 16, fontFamily: fonts.bold, color: "#111" },
   locationRow: { flexDirection: "row", alignItems: "center", gap: 4 },
   location: { fontSize: 12, fontFamily: fonts.regular, color: "#888" },
-  finder: { fontSize: 12, fontFamily: fonts.regular, color: "#aaa" },
+  finderBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: "#f8f8fa",
+    borderRadius: 12,
+    padding: 10,
+    marginTop: 4,
+  },
+  finderAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "#eef2ff",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  finderAvatarText: { fontSize: 13, fontFamily: fonts.bold, color: "#6366f1" },
+  finderName: { fontSize: 12, fontFamily: fonts.bold, color: "#333" },
+  finderDept: {
+    fontSize: 11,
+    fontFamily: fonts.regular,
+    color: "#aaa",
+    marginTop: 1,
+  },
   btnRow: {
     flexDirection: "row",
     gap: 8,
@@ -418,6 +547,21 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   confirmBtnText: { fontSize: 13, fontFamily: fonts.bold, color: "#fff" },
+  chatBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: "#6366f1",
+    shadowColor: "#6366f1",
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  chatBtnText: { fontSize: 13, fontFamily: fonts.bold, color: "#fff" },
   emptyBox: { alignItems: "center", paddingVertical: 80, gap: 12 },
   emptyIconWrap: {
     width: 72,
@@ -473,7 +617,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: 4,
   },
-  modalBtnPrimary: { backgroundColor: "#6366f1" },
   modalBtnDanger: { backgroundColor: "#f87171" },
   modalBtnText: { fontSize: 15, fontFamily: fonts.bold, color: "#fff" },
   cancelBtn: { paddingVertical: 10, alignItems: "center" },

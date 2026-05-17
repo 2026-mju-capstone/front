@@ -89,8 +89,8 @@ export type DayOfWeek = "MON" | "TUE" | "WED" | "THU" | "FRI" | "SAT" | "SUN";
 
 export interface CourseSchedule {
   dayOfWeek: DayOfWeek;
-  startTime: string; // HH:mm:ss
-  endTime: string; // HH:mm:ss
+  startTime: string;
+  endTime: string;
 }
 
 export interface Course {
@@ -149,7 +149,7 @@ export interface ItemPost {
   building_id: number;
   data_address: string;
   created_at: string;
-  reporter_id?: number; // 백엔드 추가 예정
+  reporter_id?: number;
 }
 
 export interface ItemListResponse {
@@ -202,7 +202,7 @@ export interface ChatRoomRecord {
   owner_nickname: string;
   finder_nickname: string;
   item_name: string;
-  item_id?: number; // 백엔드 추가 예정 (채팅방에서 게시글 상세로 이동 시 필요)
+  item_id?: number;
 }
 
 export interface MessageRecord {
@@ -219,7 +219,7 @@ export interface ListMessagesResult {
 }
 
 export interface CreateChatRoomRequest {
-  item_id: number;
+  item_id: number | null; // null 허용 (QR 스캔 등 item 없이 채팅 생성)
   counterpart_id: number;
 }
 
@@ -248,6 +248,7 @@ export interface MessageFilter {
 
 // Matching Types
 export type MatchStatus = "CANDIDATE" | "NOTIFIED" | "CONFIRMED" | "REJECTED";
+export type MatchType = "LOCKER" | "CHAT";
 
 export interface ItemMatchResultResponse {
   score: number;
@@ -260,7 +261,17 @@ export interface ItemMatchResultResponse {
   locationName: string;
   found_nickname: string;
   found_department: string;
-  finder_id?: number; // 백엔드 추가 예정 (시나리오 ⑤ 직접 전달 시 필요)
+  counterpart_id: number; // 상대방(습득자) user_id
+  finder_id?: number;
+}
+
+// 매칭 확정 응답 (백엔드 업데이트 예정)
+export interface ConfirmMatchResult {
+  match_id: number;
+  match_type: MatchType;
+  locker_id: number | null; // LOCKER일 때만 값, CHAT은 null
+  found_item_id: number;
+  counterpart_id: number;
 }
 
 export interface MatchManualRequest {
@@ -276,36 +287,36 @@ export interface MatchManualResponse {
   locker_id: number;
 }
 
-
+// CCTV Types
 export type CctvReviewStatus = "CONFIRMED_SELF" | "REJECTED_SELF";
 
 export interface CctvMatchedLostItem {
-    lost_item_id: number;
-    title: string;
-    category: string;
-    match_count: number;
-    reported_at: string;
-    image_url: string | null;
+  lost_item_id: number;
+  title: string;
+  category: string;
+  match_count: number;
+  reported_at: string;
+  image_url: string | null;
 }
 
 export interface CctvMyItemsResponse {
-    matched_lost_items: CctvMatchedLostItem[];
+  matched_lost_items: CctvMatchedLostItem[];
 }
 
 export interface CctvDetection {
-    match_id: number;
-    score: number;
-    detected_at: string;
-    building_name: string;
-    room_name: string;
-    item_snapshot_url: string | null;
-    moment_snapshot_url: string | null;
+  match_id: number;
+  score: number;
+  detected_at: string;
+  building_name: string;
+  room_name: string;
+  item_snapshot_url: string | null;
+  moment_snapshot_url: string | null;
 }
 
 export interface CctvItemDetectionsResponse {
-    detections: CctvDetection[];
+  detections: CctvDetection[];
 }
 
 export interface CctvReviewRequest {
-    review_status: CctvReviewStatus;
+  review_status: CctvReviewStatus;
 }
