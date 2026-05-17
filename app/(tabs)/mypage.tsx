@@ -98,7 +98,7 @@ export default function MyPageScreen() {
         <Text className="text-xl font-pretendard-bold text-gray-900">
           내 정보
         </Text>
-        <TouchableOpacity className="relative p-2">
+        <TouchableOpacity className="relative p-2" onPress={() => router.push(ROUTES.NOTIFICATION as any)}>
           <Bell size={24} color="#1F2937" />
           {profile && profile.unreadCount > 0 && (
             <View className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-white" />

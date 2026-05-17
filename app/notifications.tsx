@@ -29,6 +29,7 @@ type NotificationRecord = {
     | "CHAT_MESSAGE"
     | "ITEM_RETURNED"
     | "THEFT_SUSPECTED"
+    | "CCTV_FOUND"
     | "LOCKER_READY";
   payload: Record<string, any>;
   read_at: string | null;
@@ -40,7 +41,7 @@ const NOTIFICATION_CONFIG = {
     icon: Sparkles,
     label: "매칭 완료",
     message: "분실물과 매칭되었어요! 확인해보세요.",
-    route: ROUTES.LOST_ITEM_BOARD,
+    route: ROUTES.MATCHES,
   },
   CHAT_MESSAGE: {
     icon: MessageCircle,
@@ -59,6 +60,12 @@ const NOTIFICATION_CONFIG = {
     label: "도난 의심",
     message: "물건에 도난 의심 정황이 감지되었어요.",
     route: ROUTES.LOST_ITEM_BOARD,
+  },
+  CCTV_FOUND: {
+    icon: AlertTriangle,
+    label: "CCTV 발견",
+    message: "CCTV에서 내 물건으로 추정되는 영상이 감지되었어요.",
+    route: ROUTES.CCTV_ITEMS,
   },
   LOCKER_READY: {
     icon: Package,
