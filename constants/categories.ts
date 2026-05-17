@@ -49,6 +49,11 @@ export const ITEM_STATUS_STYLE: Record<
 > = {
     LOST: {bg: "#fff7ed", text: "#f97316", dot: "#f97316"},
     FOUND: {bg: "#dcfce7", text: "#16a34a", dot: "#22c55e"},
+    THEFT_CONFIRMED: {bg: "#fee2e2", text: "#dc2626", dot: "#ef4444"},
+};
+
+export const ITEM_STATUS_LABEL: Record<string, string> = {
+    THEFT_CONFIRMED: "도난 확정",
 };
 
 export const CATEGORIES: { label: string; value: string }[] = [

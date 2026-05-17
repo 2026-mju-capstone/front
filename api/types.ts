@@ -136,7 +136,7 @@ export interface ImageUploadResponse {
 
 // Lost Item Types
 export type ItemType = "LOST" | "FOUND";
-export type ItemStatus = "REPORTED" | "RESOLVED";
+export type ItemStatus = "REPORTED" | "RESOLVED" | "THEFT_CONFIRMED";
 
 export interface ItemPost {
   id: number;

@@ -2,6 +2,7 @@ import { BASE_BUILDINGS } from "@/constants/buildings";
 import {
   CATEGORY_ICON_MAP,
   CATEGORY_MAP,
+  ITEM_STATUS_LABEL,
   ITEM_STATUS_STYLE,
   ITEM_TYPE_MAP,
 } from "@/constants/categories";
@@ -11,6 +12,7 @@ import { useChatMutations } from "@/hooks/mutations/useChatMutations";
 import { useItemQueries } from "@/hooks/queries/useItemQueries";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
+  AlertTriangle,
   ChevronLeft,
   MapPin,
   MessageCircle,
@@ -171,10 +173,10 @@ export default function LostItemDetail() {
 
   const korCategory = CATEGORY_MAP[item.category] ?? "기타";
   const IconComponent = CATEGORY_ICON_MAP[item.category] ?? Package;
-  const statusStyle = ITEM_STATUS_STYLE[item.type] ?? {
-    bg: "#f3f4f6",
-    text: "#888",
-  };
+  const isTheftConfirmed = item.status === "THEFT_CONFIRMED";
+  const statusStyle = (isTheftConfirmed
+    ? ITEM_STATUS_STYLE.THEFT_CONFIRMED
+    : ITEM_STATUS_STYLE[item.type]) ?? { bg: "#f3f4f6", text: "#888" };
   const building = BASE_BUILDINGS.find((b) => b.id === item.building_id);
   const buildingName = building?.name ?? "";
   const detailLocation = item.data_address ?? "";
@@ -227,7 +229,9 @@ export default function LostItemDetail() {
               <Text
                 style={[styles.statusBadgeText, { color: statusStyle.text }]}
               >
-                {ITEM_TYPE_MAP[item.type]}
+                {isTheftConfirmed
+                  ? ITEM_STATUS_LABEL.THEFT_CONFIRMED
+                  : ITEM_TYPE_MAP[item.type]}
               </Text>
             </View>
           </View>
@@ -253,6 +257,15 @@ export default function LostItemDetail() {
               </Text>
             </View>
           </View>
+
+          {isTheftConfirmed && (
+            <View style={styles.theftBanner}>
+              <AlertTriangle size={16} color="#dc2626" />
+              <Text style={styles.theftBannerText}>
+                도난이 확정된 물건입니다. 경찰에 신고되었거나 수사 중일 수 있어요.
+              </Text>
+            </View>
+          )}
 
           {item.description && (
             <View style={styles.descSection}>
@@ -291,7 +304,7 @@ export default function LostItemDetail() {
       </ScrollView>
 
       <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 8 }]}>
-        {item.type === "FOUND" && (
+        {item.type === "FOUND" && !isTheftConfirmed && (
           <TouchableOpacity
             style={styles.matchBtn}
             onPress={handleMatchRequest}
@@ -301,17 +314,19 @@ export default function LostItemDetail() {
           </TouchableOpacity>
         )}
         <TouchableOpacity
-          style={styles.chatBtn}
-          onPress={handleChatPress}
-          activeOpacity={0.85}
-          disabled={createChatRoomMutation.isPending}
+          style={[styles.chatBtn, isTheftConfirmed && styles.chatBtnDisabled]}
+          onPress={isTheftConfirmed ? undefined : handleChatPress}
+          activeOpacity={isTheftConfirmed ? 1 : 0.85}
+          disabled={createChatRoomMutation.isPending || isTheftConfirmed}
         >
           {createChatRoomMutation.isPending ? (
             <ActivityIndicator color="#fff" size="small" />
           ) : (
             <>
               <MessageCircle size={18} color="#fff" />
-              <Text style={styles.chatBtnText}>채팅으로 문의하기</Text>
+              <Text style={styles.chatBtnText}>
+                {isTheftConfirmed ? "도난 확정 처리됨" : "채팅으로 문의하기"}
+              </Text>
             </>
           )}
         </TouchableOpacity>
@@ -527,6 +542,23 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   chatBtnText: { fontSize: 15, fontFamily: fonts.bold, color: "#fff" },
+  chatBtnDisabled: { backgroundColor: "#f87171", opacity: 0.6 },
+  theftBanner: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    backgroundColor: "#fee2e2",
+    borderRadius: 12,
+    padding: 14,
+    gap: 10,
+    marginBottom: 20,
+  },
+  theftBannerText: {
+    flex: 1,
+    fontSize: 13,
+    fontFamily: fonts.regular,
+    color: "#dc2626",
+    lineHeight: 19,
+  },
   shareBtn: {
     width: 50,
     height: 50,

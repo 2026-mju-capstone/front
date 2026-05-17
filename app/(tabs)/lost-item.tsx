@@ -3,6 +3,7 @@ import {
   CATEGORY_ICON_MAP,
   CATEGORY_MAP,
   CATEGORY_TO_API,
+  ITEM_STATUS_LABEL,
   ITEM_STATUS_STYLE,
   ITEM_TYPE_MAP,
 } from "@/constants/categories";
@@ -330,10 +331,13 @@ export default function LostItemBoard() {
             }
             renderItem={({ item }) => {
               const korCategory = CATEGORY_MAP[item.category] ?? "기타";
-              const korStatus = ITEM_TYPE_MAP[item.type] ?? item.type;
-              const statusStyle = ITEM_STATUS_STYLE[item.type] ?? {
-                dot: "#aaa",
-              };
+              const isTheftConfirmed = item.status === "THEFT_CONFIRMED";
+              const korStatus = isTheftConfirmed
+                ? ITEM_STATUS_LABEL.THEFT_CONFIRMED
+                : (ITEM_TYPE_MAP[item.type] ?? item.type);
+              const statusStyle = (isTheftConfirmed
+                ? ITEM_STATUS_STYLE.THEFT_CONFIRMED
+                : ITEM_STATUS_STYLE[item.type]) ?? { dot: "#aaa" };
               const IconComponent = CATEGORY_ICON_MAP[item.category] ?? Package;
               const buildingName =
                 BASE_BUILDINGS.find((b) => b.id === item.building_id)?.name ??
