@@ -150,7 +150,7 @@ export default function LostItemBoard() {
         <View style={styles.header}>
           <Text style={styles.headerTitle}>분실물 게시판</Text>
           <View style={styles.headerIcons}>
-            <TouchableOpacity style={styles.iconBtn}>
+            <TouchableOpacity style={styles.iconBtn} onPress={() => router.push(ROUTES.NOTIFICATION)}>
               <Bell size={20} color="#444" />
             </TouchableOpacity>
             <TouchableOpacity
