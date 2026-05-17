@@ -73,6 +73,26 @@ export default function QRScanScreen() {
     setIsScanning(false);
 
     try {
+      // 사물함 QR: {baseUrl}/scan/lockers/{id}/unlock
+      const lockerMatch = data.match(/\/lockers\/(\d+)\/unlock/);
+      if (lockerMatch) {
+        const id = Number(lockerMatch[1]);
+        setLockerId(id);
+        console.log("[QR] 사물함 URL QR 감지 lockerId:", id);
+        try {
+          await axiosInstance.post(`/api/lockers/${id}/unlock`);
+          setModalType("locker_success");
+        } catch (e: any) {
+          console.error("[QR] 사물함 열기 실패", e.response?.status, e.message);
+          if (e.response?.status === 403) {
+            setModalType("locker_fail");
+          } else {
+            Alert.alert("오류", "사물함 열기에 실패했어요.");
+          }
+        }
+        return;
+      }
+
       const parsed = JSON.parse(data);
 
       // 사물함 QR
