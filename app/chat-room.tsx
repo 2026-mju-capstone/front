@@ -229,7 +229,7 @@ export default function ChatRoomScreen() {
 
   const { data: profile } = useProfile();
   const { data: roomData, isLoading: isRoomLoading } =
-    useChatQueries.useChatRoom(roomIdNum);
+    useChatQueries.useChatRoom(roomIdNum, true);
   const { data: messagesData, isLoading: isMessagesLoading } =
     useChatQueries.useMessages(roomIdNum, false);
 
