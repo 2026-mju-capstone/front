@@ -1,4 +1,5 @@
 import SignupHeader from "@/components/SignupHeader";
+import { DEPARTMENTS } from "@/constants/departments";
 import { fonts } from "@/constants/typography";
 import { ROUTES } from "@/constants/url";
 import { useSignup } from "@/hooks/mutations/useAuthMutations";
@@ -8,7 +9,6 @@ import {
   BottomSheetBackdrop,
   BottomSheetFlatList,
   BottomSheetModal,
-  BottomSheetTextInput,
 } from "@gorhom/bottom-sheet";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
@@ -36,7 +36,6 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useSignup as useSignupData } from "./_layout";
-import { DEPARTMENTS } from "@/constants/departments";
 
 const GRADES = ["1학년", "2학년", "3학년", "4학년"];
 
@@ -52,7 +51,6 @@ export default function ProfilePage() {
 
   const signupMutation = useSignup();
   const nicknameQuery = useCheckNickname(data.nickname);
-
   const isLoading = signupMutation.isPending;
 
   useEffect(() => {
@@ -65,9 +63,12 @@ export default function ProfilePage() {
     }
   }, [nicknameQuery.data, data.nickname]);
 
-  const filteredDepartments = DEPARTMENTS.filter((dept) =>
-    dept.includes(searchQuery),
+  // 검색어 기반 학과 필터링
+  const filteredDepartments = useMemo(
+    () => DEPARTMENTS.filter((dept) => dept.includes(searchQuery.trim())),
+    [searchQuery],
   );
+
   const bottomSheetRef = useRef<BottomSheetModal>(null);
   const snapPoints = useMemo(() => ["95%"], []);
 
@@ -291,6 +292,7 @@ export default function ProfilePage() {
         </ScrollView>
       </KeyboardAvoidingView>
 
+      {/* 학과 선택 바텀시트 */}
       <BottomSheetModal
         ref={bottomSheetRef}
         snapPoints={snapPoints}
@@ -310,9 +312,10 @@ export default function ProfilePage() {
           </TouchableOpacity>
         </View>
 
+        {/* 일반 TextInput으로 교체 → 한글 입력 정상 동작 */}
         <View style={styles.searchBox}>
           <Search size={16} color="#aaa" style={{ marginRight: 8 }} />
-          <BottomSheetTextInput
+          <TextInput
             style={styles.searchInput}
             placeholder="학과 검색"
             placeholderTextColor="#ccc"
@@ -320,7 +323,6 @@ export default function ProfilePage() {
             onChangeText={setSearchQuery}
             autoCorrect={false}
             autoCapitalize="none"
-            keyboardType="default"
             returnKeyType="search"
           />
           {searchQuery.length > 0 && (
@@ -333,6 +335,7 @@ export default function ProfilePage() {
         <BottomSheetFlatList
           data={filteredDepartments}
           keyExtractor={(item) => item}
+          keyboardShouldPersistTaps="handled"
           renderItem={({ item }) => (
             <TouchableOpacity
               style={[
