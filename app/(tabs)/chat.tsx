@@ -4,9 +4,9 @@ import { fonts } from "@/constants/typography";
 import { ROUTES } from "@/constants/url";
 import { useChatQueries } from "@/hooks/queries/useChatQueries";
 import { useProfile } from "@/hooks/queries/useUserQueries";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { Bell, MessageCircle, User } from "lucide-react-native";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   FlatList,
   RefreshControl,
@@ -58,11 +58,7 @@ export default function ChatScreen() {
 
   const { data: roomListData, refetch } = useChatQueries.useChatRooms();
 
-  useEffect(() => {
-    loadChatRooms();
-  }, [roomListData]);
-
-  const loadChatRooms = async () => {
+  const loadChatRooms = useCallback(async () => {
     setIsLoading(true);
     const ids = roomListData?.data?.chatRoomIds;
     if (!ids?.length) {
@@ -84,7 +80,19 @@ export default function ChatScreen() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [roomListData]);
+
+  // 채팅방 ID 목록 변경 시 (새 채팅방 생성 등)
+  useEffect(() => {
+    loadChatRooms();
+  }, [loadChatRooms]);
+
+  // 채팅 탭으로 돌아올 때 방 상태 갱신 (거래 완료 등 상태 변경 반영)
+  useFocusEffect(
+    useCallback(() => {
+      loadChatRooms();
+    }, [loadChatRooms]),
+  );
 
   const onRefresh = async () => {
     setIsRefreshing(true);
