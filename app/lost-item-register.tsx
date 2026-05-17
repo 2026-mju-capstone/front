@@ -95,6 +95,8 @@ export default function LostItemRegister() {
     const [showBuildingSheet, setShowBuildingSheet] = useState(false);
     const [showRoomSheet, setShowRoomSheet] = useState(false);
 
+    const [showDeliveryModal, setShowDeliveryModal] = useState(false);
+
     const createItemMutation = useItemMutations.useCreateItem();
 
     // 시간표 fetch
@@ -219,22 +221,26 @@ export default function LostItemRegister() {
         return e;
     };
 
-    const handleSubmit = async () => {
+    const handleSubmit = () => {
         const e = validate();
         if (Object.keys(e).length > 0) { setErrors(e); return; }
         setErrors({});
 
+        if (type === "FOUND") {
+            setShowDeliveryModal(true);
+            return;
+        }
+
+        doSubmit("direct");
+    };
+
+    const doSubmit = async (deliveryChoice: "direct" | "locker") => {
         let building_id: number;
         let detail_address: string;
 
-        if (type === "LOST") {
-            if (hasTimetable) {
-                building_id = matchedCourse!.buildingId;
-                detail_address = matchedCourse!.roomName;
-            } else {
-                building_id = selectedBuildingId!;
-                detail_address = selectedRoomName;
-            }
+        if (type === "LOST" && hasTimetable) {
+            building_id = matchedCourse!.buildingId;
+            detail_address = matchedCourse!.roomName;
         } else {
             building_id = selectedBuildingId!;
             detail_address = selectedRoomName;
@@ -265,12 +271,20 @@ export default function LostItemRegister() {
                 },
                 {
                     onSuccess: (result) => {
-                        if (result.success) {
-                            const itemId = result.data?.itemId;
+                        const itemId = result.data?.item_post_id;
+                        if (deliveryChoice === "locker") {
+                            if (!itemId) {
+                                Alert.alert(
+                                    "등록 완료",
+                                    "게시물이 등록됐어요. 서버에서 게시글 ID를 받지 못했습니다. 게시판에서 확인해주세요.",
+                                    [{ text: "확인", onPress: () => router.back() }],
+                                );
+                                return;
+                            }
+                            router.push(`${ROUTES.SCAN}?itemId=${itemId}` as any);
+                        } else {
                             if (itemId) router.replace(`${ROUTES.LOST_ITEM_DETAIL}?id=${itemId}`);
                             else router.back();
-                        } else {
-                            Alert.alert("등록 실패", result.error ?? "다시 시도해주세요.");
                         }
                     },
                     onError: () => Alert.alert("오류", "네트워크 오류가 발생했어요."),
@@ -703,6 +717,41 @@ export default function LostItemRegister() {
                     }}
                 />
             )}
+
+            {/* 전달 방법 선택 모달 */}
+            <Modal visible={showDeliveryModal} transparent animationType="fade">
+                <Pressable style={styles.modalOverlay} onPress={() => setShowDeliveryModal(false)} />
+                <View style={styles.deliveryModalWrap}>
+                    <View style={styles.deliveryModalCard}>
+                        <Text style={styles.deliveryModalTitle}>전달 방법 선택</Text>
+                        <Text style={styles.deliveryModalDesc}>
+                            물건을 어떻게 전달하시겠어요?
+                        </Text>
+                        <TouchableOpacity
+                            style={styles.deliveryPrimaryBtn}
+                            disabled={createItemMutation.isPending}
+                            onPress={() => {
+                                setShowDeliveryModal(false);
+                                doSubmit("direct");
+                            }}
+                        >
+                            <Text style={styles.deliveryBtnText}>
+                                {createItemMutation.isPending ? "등록 중..." : "직접 전달하기"}
+                            </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={styles.deliverySecondaryBtn}
+                            disabled={createItemMutation.isPending}
+                            onPress={() => {
+                                setShowDeliveryModal(false);
+                                doSubmit("locker");
+                            }}
+                        >
+                            <Text style={[styles.deliveryBtnText, { color: "#6366f1" }]}>사물함에 넣기</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
         </View>
     );
 }
@@ -837,4 +886,27 @@ const styles = StyleSheet.create({
     sheetItemText: { fontSize: 14, fontFamily: fonts.regular, color: "#444" },
     sheetItemTextActive: { color: "#6366f1", fontFamily: fonts.bold },
     sheetItemCheck: { fontSize: 14, color: "#6366f1", fontFamily: fonts.bold },
+    deliveryModalWrap: {
+        position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
+        alignItems: "center", justifyContent: "center", paddingHorizontal: 32,
+    },
+    deliveryModalCard: {
+        width: "100%", backgroundColor: "#fff", borderRadius: 20,
+        padding: 24, gap: 12,
+        shadowColor: "#000", shadowOpacity: 0.1, shadowRadius: 16, elevation: 8,
+    },
+    deliveryModalTitle: { fontSize: 17, fontFamily: fonts.bold, color: "#111", textAlign: "center" },
+    deliveryModalDesc: {
+        fontSize: 13, fontFamily: fonts.regular, color: "#666",
+        textAlign: "center", lineHeight: 19,
+    },
+    deliveryPrimaryBtn: {
+        backgroundColor: "#6366f1", borderRadius: 12, paddingVertical: 14,
+        alignItems: "center", marginTop: 4,
+    },
+    deliverySecondaryBtn: {
+        borderWidth: 1.5, borderColor: "#e5e7eb", borderRadius: 12,
+        paddingVertical: 14, alignItems: "center",
+    },
+    deliveryBtnText: { fontSize: 15, fontFamily: fonts.bold, color: "#fff" },
 });
