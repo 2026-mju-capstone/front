@@ -190,7 +190,7 @@ export interface CreateItemRequest {
 }
 
 export interface CreateItemResponse {
-  itemId: number;
+  item_post_id: number;
   message: string;
   item_status: string;
 }

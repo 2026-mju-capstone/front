@@ -4,7 +4,7 @@ import { ROUTES } from "@/constants/url";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import {
   Archive,
   Bell,
@@ -40,6 +40,7 @@ type OwnerInfo = {
 export default function QRScanScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { itemId: itemIdParam } = useLocalSearchParams<{ itemId?: string }>();
   const [permission, requestPermission] = useCameraPermissions();
   const [isScanning, setIsScanning] = useState(false);
   const [modalType, setModalType] = useState<ModalType>(null);
@@ -78,16 +79,27 @@ export default function QRScanScreen() {
       if (lockerMatch) {
         const id = Number(lockerMatch[1]);
         setLockerId(id);
-        console.log("[QR] 사물함 URL QR 감지 lockerId:", id);
+
+        if (!itemIdParam) {
+          Alert.alert(
+            "물품 정보 없음",
+            "분실물을 먼저 등록하고 '사물함에 넣기'를 선택해주세요.",
+          );
+          isProcessing.current = false;
+          return;
+        }
+
         try {
-          await axiosInstance.post(`/api/lockers/${id}/unlock`);
+          await axiosInstance.post(`/api/lockers/${id}/unlock`, {
+            itemId: Number(itemIdParam),
+          });
           setModalType("locker_success");
         } catch (e: any) {
-          console.error("[QR] 사물함 열기 실패", e.response?.status, e.message);
           if (e.response?.status === 403) {
             setModalType("locker_fail");
           } else {
-            Alert.alert("오류", "사물함 열기에 실패했어요.");
+            const serverMsg: string | undefined = e.response?.data?.error;
+            Alert.alert("오류", serverMsg ?? "사물함 열기에 실패했어요.");
           }
         }
         return;
@@ -108,7 +120,8 @@ export default function QRScanScreen() {
           if (e.response?.status === 403) {
             setModalType("locker_fail");
           } else {
-            Alert.alert("오류", "사물함 열기에 실패했어요.");
+            const serverMsg: string | undefined = e.response?.data?.error;
+            Alert.alert("오류", serverMsg ?? "사물함 열기에 실패했어요.");
           }
         }
       }
@@ -188,6 +201,9 @@ export default function QRScanScreen() {
     }
     setModalType(null);
     setLockerId(null);
+    if (itemIdParam) {
+      router.replace(`${ROUTES.LOST_ITEM_DETAIL}?id=${itemIdParam}` as any);
+    }
   };
 
   // 카메라 스캔 화면
