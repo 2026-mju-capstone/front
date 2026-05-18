@@ -71,9 +71,13 @@ class ChatSocketManager {
     onStatus?: StatusHandler,
     onError?: ErrorHandler,
   ) {
-    // 이미 같은 방에 연결 중이면 무시
-    if (this.socket?.readyState === WebSocket.OPEN && this.roomId === roomId)
+    // 이미 같은 방에 연결 중이면 핸들러만 교체하고 소켓 재연결 스킵
+    if (this.socket?.readyState === WebSocket.OPEN && this.roomId === roomId) {
+      this.messageHandler = onMessage;
+      this.statusHandler = onStatus ?? null;
+      this.errorHandler = onError ?? null;
       return;
+    }
 
     this.disconnect();
     this.isManualClose = false;

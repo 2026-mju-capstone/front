@@ -97,10 +97,21 @@ export interface Course {
   courseId: number;
   courseName: string;
   roomName: string;
+  buildingId: number;
   buildingName: string;
   buildingCode: string;
   color?: string;
   schedules: CourseSchedule[];
+}
+
+export interface BuildingRecord {
+  id: number;
+  name: string;
+}
+
+export interface RoomRecord {
+  id: number;
+  name: string;
 }
 
 export interface TimetableSummary {
@@ -136,7 +147,7 @@ export interface ImageUploadResponse {
 
 // Lost Item Types
 export type ItemType = "LOST" | "FOUND";
-export type ItemStatus = "REPORTED" | "RESOLVED";
+export type ItemStatus = "REPORTED" | "RESOLVED" | "THEFT_CONFIRMED";
 
 export interface ItemPost {
   id: number;
@@ -179,7 +190,7 @@ export interface CreateItemRequest {
 }
 
 export interface CreateItemResponse {
-  itemId: number;
+  item_post_id: number;
   message: string;
   item_status: string;
 }

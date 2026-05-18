@@ -3,6 +3,7 @@ import ProfileEditModal from "@/components/ProfileEditModal";
 import { ROUTES } from "@/constants/url";
 import { useProfile } from "@/hooks/queries/useUserQueries";
 import { useAuthStore } from "@/store/authStore";
+import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import {
   Bell,
@@ -34,6 +35,7 @@ export default function MyPageScreen() {
   const insets = useSafeAreaInsets();
   const { data: profile, isLoading } = useProfile();
   const { clearToken } = useAuthStore();
+  const queryClient = useQueryClient();
 
   const [pushEnabled, setPushEnabled] = useState(true);
   const [chatOnlyMode, setChatOnlyMode] = useState(true);
@@ -47,9 +49,11 @@ export default function MyPageScreen() {
         onPress: async () => {
           try {
             await authService.logout();
-            clearToken();
-          } catch (error) {
-            clearToken();
+          } catch {
+            // 서버 실패해도 로컬 정리 진행
+          } finally {
+            clearToken();      // 토큰 먼저 제거 → enabled: !!token = false
+            queryClient.clear(); // 이후 캐시 정리 (re-fetch 시도 안 함)
           }
         },
       },
@@ -94,7 +98,7 @@ export default function MyPageScreen() {
         <Text className="text-xl font-pretendard-bold text-gray-900">
           내 정보
         </Text>
-        <TouchableOpacity className="relative p-2">
+        <TouchableOpacity className="relative p-2" onPress={() => router.push(ROUTES.NOTIFICATION as any)}>
           <Bell size={24} color="#1F2937" />
           {profile && profile.unreadCount > 0 && (
             <View className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-white" />

@@ -229,7 +229,7 @@ export default function ChatRoomScreen() {
 
   const { data: profile } = useProfile();
   const { data: roomData, isLoading: isRoomLoading } =
-    useChatQueries.useChatRoom(roomIdNum);
+    useChatQueries.useChatRoom(roomIdNum, true);
   const { data: messagesData, isLoading: isMessagesLoading } =
     useChatQueries.useMessages(roomIdNum, false);
 
@@ -248,10 +248,10 @@ export default function ChatRoomScreen() {
   const reopenChatRoomMutation = useChatMutations.useReopenChatRoom(roomIdNum);
 
   const chatRoom = roomData?.success ? roomData.data : null;
-  const counterpartNickname =
-    profile?.nickname === chatRoom?.owner_nickname
-      ? chatRoom?.finder_nickname
-      : chatRoom?.owner_nickname;
+  const isOwner = profile?.nickname === chatRoom?.owner_nickname;
+  const counterpartNickname = isOwner
+    ? chatRoom?.finder_nickname
+    : chatRoom?.owner_nickname;
   const messages = messagesData?.success ? messagesData.data.messages : [];
   const isClosed = chatRoom?.status !== "OPEN";
   const isLoading = isRoomLoading || isMessagesLoading;
@@ -326,19 +326,29 @@ export default function ChatRoomScreen() {
   ]);
 
   const handleClose = useCallback(
-    (reason: "RETURNED" | "ABANDONED") => {
+    (reason: "RETURNED" | "ABANDONED", navigateToScan = false) => {
       setShowCloseModal(false);
       closeChatRoomMutation.mutate(reason, {
         onSuccess: () => {
-          Toast.show({
-            type: "success",
-            text1:
-              reason === "RETURNED"
-                ? "반환 완료 처리되었어요"
-                : "거래가 종료되었어요",
-            position: "bottom",
-            visibilityTime: 2500,
-          });
+          if (reason === "RETURNED" && navigateToScan) {
+            Toast.show({
+              type: "success",
+              text1: "수령 완료! 사물함 QR을 스캔해서 물건을 꺼내주세요.",
+              position: "bottom",
+              visibilityTime: 3000,
+            });
+            router.replace("/(tabs)/scan" as any);
+          } else {
+            Toast.show({
+              type: "success",
+              text1:
+                reason === "RETURNED"
+                  ? "거래가 완료되었어요"
+                  : "거래가 종료되었어요",
+              position: "bottom",
+              visibilityTime: 2500,
+            });
+          }
         },
         onError: () => {
           Toast.show({
@@ -571,12 +581,29 @@ export default function ChatRoomScreen() {
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>거래 종료</Text>
             <Text style={styles.modalDesc}>거래를 어떻게 종료할까요?</Text>
-            <TouchableOpacity
-              style={styles.modalBtn}
-              onPress={() => handleClose("RETURNED")}
-            >
-              <Text style={styles.modalBtnText}>✅ 물건을 돌려받았어요</Text>
-            </TouchableOpacity>
+            {isOwner ? (
+              <>
+                <TouchableOpacity
+                  style={styles.modalBtn}
+                  onPress={() => handleClose("RETURNED", true)}
+                >
+                  <Text style={styles.modalBtnText}>📦 사물함에서 물건을 꺼낼게요</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.modalBtn}
+                  onPress={() => handleClose("RETURNED", false)}
+                >
+                  <Text style={styles.modalBtnText}>🤝 직접 물건을 받았어요</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <TouchableOpacity
+                style={styles.modalBtn}
+                onPress={() => handleClose("RETURNED")}
+              >
+                <Text style={styles.modalBtnText}>✅ 물건을 찾아줬어요</Text>
+              </TouchableOpacity>
+            )}
             <TouchableOpacity
               style={[styles.modalBtn, styles.modalBtnGray]}
               onPress={() => handleClose("ABANDONED")}

@@ -17,11 +17,12 @@ export const useChatQueries = {
     }),
 
   // 채팅방 상세
-  useChatRoom: (roomId: number) =>
+  useChatRoom: (roomId: number, pollWhileOpen: boolean = false) =>
     useQuery({
       queryKey: CHAT_QUERY_KEYS.room(roomId),
       queryFn: () => chatService.getChatRoom(roomId),
       enabled: !!roomId,
+      refetchInterval: pollWhileOpen ? 3000 : false,
     }),
 
   // 메시지 목록 (포커스 있을 때만 폴링)
