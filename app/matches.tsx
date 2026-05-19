@@ -1,3 +1,4 @@
+import type { ItemMatchResultResponse } from "@/api/types";
 import { fonts } from "@/constants/typography";
 import { BASE_URL, ROUTES } from "@/constants/url";
 import { useChatMutations } from "@/hooks/mutations/useChatMutations";
@@ -8,8 +9,8 @@ import {
   Archive,
   Award,
   Building2,
-  CheckCircle2,
   CheckCircle,
+  CheckCircle2,
   ChevronLeft,
   MessageCircle,
   QrCode,
@@ -31,7 +32,6 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Toast from "react-native-toast-message";
-import type { ItemMatchResultResponse } from "@/api/types";
 
 // ── 수락 완료 후 안내 바텀시트 ───────────────────────────
 interface AcceptedSheetProps {
@@ -42,7 +42,13 @@ interface AcceptedSheetProps {
   onGoLocker: () => void;
 }
 
-function AcceptedSheet({ match, matchType, onClose, onGoChat, onGoLocker }: AcceptedSheetProps) {
+function AcceptedSheet({
+  match,
+  matchType,
+  onClose,
+  onGoChat,
+  onGoLocker,
+}: AcceptedSheetProps) {
   const isChat = matchType === "CHAT";
 
   return (
@@ -74,12 +80,17 @@ function AcceptedSheet({ match, matchType, onClose, onGoChat, onGoLocker }: Acce
                   </Text>
                 </View>
                 <View>
-                  <Text style={sheetStyles.finderName}>{match.found_nickname}</Text>
-                  <Text style={sheetStyles.finderDept}>{match.found_department}</Text>
+                  <Text style={sheetStyles.finderName}>
+                    {match.found_nickname}
+                  </Text>
+                  <Text style={sheetStyles.finderDept}>
+                    {match.found_department}
+                  </Text>
                 </View>
               </View>
               <Text style={sheetStyles.infoDesc}>
-                채팅으로 {match.found_nickname}님과 직접 연락해서{"\n"}만날 장소와 시간을 조율하세요.
+                채팅으로 {match.found_nickname}님과 직접 연락해서{"\n"}만날
+                장소와 시간을 조율하세요.
               </Text>
             </View>
             <TouchableOpacity
@@ -91,8 +102,12 @@ function AcceptedSheet({ match, matchType, onClose, onGoChat, onGoLocker }: Acce
                 <MessageCircle size={18} color="#fff" />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={sheetStyles.actionTitle}>{match.found_nickname}님과 채팅하기</Text>
-                <Text style={sheetStyles.actionDesc}>채팅방으로 바로 이동해요</Text>
+                <Text style={sheetStyles.actionTitle}>
+                  {match.found_nickname}님과 채팅하기
+                </Text>
+                <Text style={sheetStyles.actionDesc}>
+                  채팅방으로 바로 이동해요
+                </Text>
               </View>
             </TouchableOpacity>
           </>
@@ -106,7 +121,8 @@ function AcceptedSheet({ match, matchType, onClose, onGoChat, onGoLocker }: Acce
                 <Text style={sheetStyles.lockerTitle}>사물함 회수 방식</Text>
               </View>
               <Text style={sheetStyles.infoDesc}>
-                {match.found_nickname}님이 AI 사물함에 물건을 보관했어요.{"\n"}QR 코드로 직접 꺼내가세요.
+                {match.found_nickname}님이 AI 사물함에 물건을 보관했어요.{"\n"}
+                QR 코드로 직접 꺼내가세요.
               </Text>
             </View>
             <TouchableOpacity
@@ -119,13 +135,19 @@ function AcceptedSheet({ match, matchType, onClose, onGoChat, onGoLocker }: Acce
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={sheetStyles.actionTitle}>사물함 QR 코드 열기</Text>
-                <Text style={sheetStyles.actionDesc}>QR 스캔으로 사물함 열기</Text>
+                <Text style={sheetStyles.actionDesc}>
+                  QR 스캔으로 사물함 열기
+                </Text>
               </View>
             </TouchableOpacity>
           </>
         )}
 
-        <TouchableOpacity style={sheetStyles.laterBtn} onPress={onClose} activeOpacity={0.85}>
+        <TouchableOpacity
+          style={sheetStyles.laterBtn}
+          onPress={onClose}
+          activeOpacity={0.85}
+        >
           <Text style={sheetStyles.laterBtnText}>나중에 하기</Text>
         </TouchableOpacity>
       </View>
@@ -163,7 +185,9 @@ export default function MatchesScreen() {
     .slice(0, 5);
 
   // 완료된 매칭 (수락된 것들)
-  const completedMatches = matches.filter((m) => acceptedIds.includes(m.match_id));
+  const completedMatches = matches.filter((m) =>
+    acceptedIds.includes(m.match_id),
+  );
 
   const onRefresh = async () => {
     setIsRefreshing(true);
@@ -283,17 +307,22 @@ export default function MatchesScreen() {
 
   if (isLoading) {
     return (
-      <View style={[styles.container, { alignItems: "center", justifyContent: "center" }]}>
+      <View
+        style={[
+          styles.container,
+          { alignItems: "center", justifyContent: "center" },
+        ]}
+      >
         <ActivityIndicator color="#6366f1" size="large" />
       </View>
     );
   }
 
   // FlatList 데이터: 진행 중 + 구분선 + 완료된 것
-  const listData: Array
+  const listData: (
     | { type: "match"; data: ItemMatchResultResponse; isCompleted: boolean }
     | { type: "divider" }
-  > = [
+  )[] = [
     ...pendingMatches.map((m) => ({
       type: "match" as const,
       data: m,
@@ -323,7 +352,9 @@ export default function MatchesScreen() {
       <FlatList
         data={listData}
         keyExtractor={(item, idx) =>
-          item.type === "divider" ? `divider-${idx}` : String(item.data.match_id)
+          item.type === "divider"
+            ? `divider-${idx}`
+            : String(item.data.match_id)
         }
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
@@ -344,7 +375,8 @@ export default function MatchesScreen() {
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.introTitle}>
-                    분실물과 유사한 습득물 {pendingMatches.length}개를 발견했어요
+                    분실물과 유사한 습득물 {pendingMatches.length}개를
+                    발견했어요
                   </Text>
                   <Text style={styles.introDesc}>
                     유사도 높은 순으로 최대 5개를 보여드려요
@@ -420,7 +452,9 @@ export default function MatchesScreen() {
                 </View>
                 <View style={styles.completedBanner}>
                   <CheckCircle2 size={14} color="#fff" />
-                  <Text style={styles.completedBannerText}>매칭이 성공적으로 처리됐어요</Text>
+                  <Text style={styles.completedBannerText}>
+                    매칭이 성공적으로 처리됐어요
+                  </Text>
                 </View>
                 <View style={styles.info}>
                   <Text style={styles.title} numberOfLines={1}>
@@ -441,9 +475,13 @@ export default function MatchesScreen() {
                       </Text>
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.finderName}>{match.found_nickname}</Text>
+                      <Text style={styles.finderName}>
+                        {match.found_nickname}
+                      </Text>
                       {match.found_department ? (
-                        <Text style={styles.finderDept}>{match.found_department}</Text>
+                        <Text style={styles.finderDept}>
+                          {match.found_department}
+                        </Text>
                       ) : null}
                     </View>
                     <View style={styles.completedTag}>
@@ -482,7 +520,9 @@ export default function MatchesScreen() {
                   )}
                   <View style={styles.scoreBadgeOverlay}>
                     <Award size={11} color="#fff" />
-                    <Text style={styles.scoreBadgeText}>유사도 {scorePercent}%</Text>
+                    <Text style={styles.scoreBadgeText}>
+                      유사도 {scorePercent}%
+                    </Text>
                   </View>
                 </View>
               </TouchableOpacity>
@@ -506,9 +546,13 @@ export default function MatchesScreen() {
                     </Text>
                   </View>
                   <View>
-                    <Text style={styles.finderName}>{match.found_nickname}</Text>
+                    <Text style={styles.finderName}>
+                      {match.found_nickname}
+                    </Text>
                     {match.found_department ? (
-                      <Text style={styles.finderDept}>{match.found_department}</Text>
+                      <Text style={styles.finderDept}>
+                        {match.found_department}
+                      </Text>
                     ) : null}
                   </View>
                 </View>
@@ -551,7 +595,9 @@ export default function MatchesScreen() {
         <View style={styles.modalWrap}>
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>매칭을 거절하시겠어요?</Text>
-            <Text style={styles.modalDesc}>거절한 매칭은 다시 받을 수 없어요.</Text>
+            <Text style={styles.modalDesc}>
+              거절한 매칭은 다시 받을 수 없어요.
+            </Text>
             <TouchableOpacity
               style={[styles.modalBtn, styles.modalBtnDanger]}
               onPress={handleReject}
@@ -616,8 +662,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  introTitle: { fontSize: 13, fontFamily: fonts.bold, color: "#6366f1", marginBottom: 2 },
-  introDesc: { fontSize: 11, fontFamily: fonts.regular, color: "#6366f1", opacity: 0.8 },
+  introTitle: {
+    fontSize: 13,
+    fontFamily: fonts.bold,
+    color: "#6366f1",
+    marginBottom: 2,
+  },
+  introDesc: {
+    fontSize: 11,
+    fontFamily: fonts.regular,
+    color: "#6366f1",
+    opacity: 0.8,
+  },
   completedBadgeWrap: { alignItems: "flex-end", marginTop: 8, marginBottom: 4 },
   completedBadge: {
     flexDirection: "row",
@@ -630,7 +686,11 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     borderRadius: 20,
   },
-  completedBadgeText: { fontSize: 11, fontFamily: fonts.bold, color: "#10b981" },
+  completedBadgeText: {
+    fontSize: 11,
+    fontFamily: fonts.bold,
+    color: "#10b981",
+  },
   card: {
     backgroundColor: "#fff",
     borderRadius: 16,
@@ -701,7 +761,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
   },
-  completedBannerText: { fontSize: 12, fontFamily: fonts.bold, color: "#fff", flex: 1 },
+  completedBannerText: {
+    fontSize: 12,
+    fontFamily: fonts.bold,
+    color: "#fff",
+    flex: 1,
+  },
   info: { paddingHorizontal: 14, paddingTop: 12, paddingBottom: 14, gap: 6 },
   title: { fontSize: 16, fontFamily: fonts.bold, color: "#111" },
   locationRow: { flexDirection: "row", alignItems: "center", gap: 4 },
@@ -725,7 +790,12 @@ const styles = StyleSheet.create({
   },
   finderAvatarText: { fontSize: 13, fontFamily: fonts.bold, color: "#6366f1" },
   finderName: { fontSize: 12, fontFamily: fonts.bold, color: "#333" },
-  finderDept: { fontSize: 11, fontFamily: fonts.regular, color: "#aaa", marginTop: 1 },
+  finderDept: {
+    fontSize: 11,
+    fontFamily: fonts.regular,
+    color: "#aaa",
+    marginTop: 1,
+  },
   completedTag: {
     flexDirection: "row",
     alignItems: "center",
@@ -736,7 +806,12 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   completedTagText: { fontSize: 10, fontFamily: fonts.bold, color: "#10b981" },
-  btnRow: { flexDirection: "row", gap: 8, paddingHorizontal: 14, paddingBottom: 14 },
+  btnRow: {
+    flexDirection: "row",
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingBottom: 14,
+  },
   rejectBtn: {
     flex: 1,
     flexDirection: "row",
@@ -782,8 +857,16 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   emptyTitle: { fontSize: 16, fontFamily: fonts.bold, color: "#333" },
-  emptyDesc: { fontSize: 13, fontFamily: fonts.regular, color: "#aaa", textAlign: "center" },
-  modalOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.4)" },
+  emptyDesc: {
+    fontSize: 13,
+    fontFamily: fonts.regular,
+    color: "#aaa",
+    textAlign: "center",
+  },
+  modalOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.4)",
+  },
   modalWrap: {
     position: "absolute",
     top: 0,
@@ -806,7 +889,12 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   modalTitle: { fontSize: 17, fontFamily: fonts.bold, color: "#111" },
-  modalDesc: { fontSize: 13, fontFamily: fonts.regular, color: "#666", lineHeight: 19 },
+  modalDesc: {
+    fontSize: 13,
+    fontFamily: fonts.regular,
+    color: "#666",
+    lineHeight: 19,
+  },
   modalBtn: {
     borderRadius: 12,
     paddingVertical: 14,
@@ -865,7 +953,12 @@ const sheetStyles = StyleSheet.create({
     justifyContent: "center",
   },
   bannerTitle: { fontSize: 14, fontFamily: fonts.bold, color: "#065f46" },
-  bannerDesc: { fontSize: 11, fontFamily: fonts.regular, color: "#10b981", marginTop: 2 },
+  bannerDesc: {
+    fontSize: 11,
+    fontFamily: fonts.regular,
+    color: "#10b981",
+    marginTop: 2,
+  },
   infoBox: {
     backgroundColor: "#f8f8fa",
     borderWidth: 1,
@@ -890,8 +983,18 @@ const sheetStyles = StyleSheet.create({
   },
   finderAvatarText: { fontSize: 16, fontFamily: fonts.bold, color: "#6366f1" },
   finderName: { fontSize: 14, fontFamily: fonts.bold, color: "#111" },
-  finderDept: { fontSize: 11, fontFamily: fonts.regular, color: "#888", marginTop: 2 },
-  infoDesc: { fontSize: 12, fontFamily: fonts.regular, color: "#666", lineHeight: 18 },
+  finderDept: {
+    fontSize: 11,
+    fontFamily: fonts.regular,
+    color: "#888",
+    marginTop: 2,
+  },
+  infoDesc: {
+    fontSize: 12,
+    fontFamily: fonts.regular,
+    color: "#666",
+    lineHeight: 18,
+  },
   lockerHeader: {
     flexDirection: "row",
     alignItems: "center",
@@ -924,7 +1027,12 @@ const sheetStyles = StyleSheet.create({
     justifyContent: "center",
   },
   actionTitle: { fontSize: 14, fontFamily: fonts.bold, color: "#fff" },
-  actionDesc: { fontSize: 11, fontFamily: fonts.regular, color: "rgba(255,255,255,0.8)", marginTop: 2 },
+  actionDesc: {
+    fontSize: 11,
+    fontFamily: fonts.regular,
+    color: "rgba(255,255,255,0.8)",
+    marginTop: 2,
+  },
   laterBtn: {
     marginTop: 12,
     paddingVertical: 12,
