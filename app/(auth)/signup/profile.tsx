@@ -5,11 +5,6 @@ import { ROUTES } from "@/constants/url";
 import { useSignup } from "@/hooks/mutations/useAuthMutations";
 import { useCheckNickname } from "@/hooks/queries/useAuthQueries";
 import { useAuthStore } from "@/store/authStore";
-import {
-  BottomSheetBackdrop,
-  BottomSheetFlatList,
-  BottomSheetModal,
-} from "@gorhom/bottom-sheet";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import {
@@ -21,11 +16,12 @@ import {
   User,
   X,
 } from "lucide-react-native";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Keyboard,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   ScrollView,
   StyleSheet,
@@ -48,6 +44,7 @@ export default function ProfilePage() {
   const [isNicknameAvailable, setIsNicknameAvailable] = useState<
     boolean | null
   >(null);
+  const [isDeptModalVisible, setIsDeptModalVisible] = useState(false);
 
   const signupMutation = useSignup();
   const nicknameQuery = useCheckNickname(data.nickname);
@@ -69,28 +66,16 @@ export default function ProfilePage() {
     [searchQuery],
   );
 
-  const bottomSheetRef = useRef<BottomSheetModal>(null);
-  const snapPoints = useMemo(() => ["95%"], []);
-
-  const openDeptSheet = () => {
+  const openDeptModal = () => {
     Keyboard.dismiss();
     setSearchQuery("");
-    bottomSheetRef.current?.present();
+    setIsDeptModalVisible(true);
   };
 
-  const closeDeptSheet = () => bottomSheetRef.current?.dismiss();
-
-  const renderBackdrop = useCallback(
-    (props: any) => (
-      <BottomSheetBackdrop
-        {...props}
-        disappearsOnIndex={-1}
-        appearsOnIndex={0}
-        opacity={0.4}
-      />
-    ),
-    [],
-  );
+  const closeDeptModal = () => {
+    setIsDeptModalVisible(false);
+    setSearchQuery("");
+  };
 
   const validate = () => {
     const e: Record<string, string> = {};
@@ -208,7 +193,7 @@ export default function ProfilePage() {
               styles.inputBox,
               errors.department ? styles.inputError : null,
             ]}
-            onPress={openDeptSheet}
+            onPress={openDeptModal}
           >
             <Building2 size={18} color="#aaa" style={styles.inputIcon} />
             <Text
@@ -292,81 +277,93 @@ export default function ProfilePage() {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* 학과 선택 바텀시트 */}
-      <BottomSheetModal
-        ref={bottomSheetRef}
-        snapPoints={snapPoints}
-        backdropComponent={renderBackdrop}
-        backgroundStyle={styles.bottomSheetBg}
-        handleIndicatorStyle={styles.bottomSheetHandle}
-        enableOverDrag={false}
-        enablePanDownToClose={true}
-        enableContentPanningGesture={false}
-        keyboardBehavior="fillParent"
-        keyboardBlurBehavior="restore"
+      {/* 학과 선택 모달 */}
+      <Modal
+        visible={isDeptModalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={closeDeptModal}
       >
-        <View style={styles.bottomSheetHeader}>
-          <Text style={styles.bottomSheetTitle}>학과 선택</Text>
-          <TouchableOpacity onPress={closeDeptSheet}>
-            <X size={22} color="#333" />
-          </TouchableOpacity>
-        </View>
-
-        {/* 일반 TextInput으로 교체 → 한글 입력 정상 동작 */}
-        <View style={styles.searchBox}>
-          <Search size={16} color="#aaa" style={{ marginRight: 8 }} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="학과 검색"
-            placeholderTextColor="#ccc"
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            autoCorrect={false}
-            autoCapitalize="none"
-            returnKeyType="search"
-          />
-          {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={() => setSearchQuery("")}>
-              <X size={16} color="#ccc" />
-            </TouchableOpacity>
-          )}
-        </View>
-
-        <BottomSheetFlatList
-          data={filteredDepartments}
-          keyExtractor={(item) => item}
-          keyboardShouldPersistTaps="handled"
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              style={[
-                styles.deptItem,
-                data.department === item && styles.deptItemSelected,
-              ]}
-              onPress={() => {
-                updateData({ department: item });
-                setErrors((p) => ({ ...p, department: "" }));
-                closeDeptSheet();
-              }}
-            >
-              <Text
-                style={[
-                  styles.deptItemText,
-                  data.department === item && styles.deptItemTextSelected,
-                ]}
-              >
-                {item}
-              </Text>
-              {data.department === item && <Check size={18} color="#6366f1" />}
-            </TouchableOpacity>
-          )}
-          contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}
-          ListEmptyComponent={
-            <View style={styles.emptyBox}>
-              <Text style={styles.emptyText}>검색 결과가 없어요</Text>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={styles.modalContainer}
+        >
+          <View style={styles.modalContent}>
+            {/* Handle */}
+            <View style={styles.handleWrap}>
+              <View style={styles.handle} />
             </View>
-          }
-        />
-      </BottomSheetModal>
+
+            {/* Header */}
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>학과 선택</Text>
+              <TouchableOpacity onPress={closeDeptModal}>
+                <X size={22} color="#333" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Search */}
+            <View style={styles.searchBox}>
+              <Search size={16} color="#aaa" style={{ marginRight: 8 }} />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="학과 검색"
+                placeholderTextColor="#ccc"
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                autoCorrect={false}
+                autoCapitalize="none"
+                returnKeyType="search"
+              />
+              {searchQuery.length > 0 && (
+                <TouchableOpacity onPress={() => setSearchQuery("")}>
+                  <X size={16} color="#ccc" />
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {/* List */}
+            <ScrollView
+              style={{ flex: 1 }}
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}
+            >
+              {filteredDepartments.length > 0 ? (
+                filteredDepartments.map((item) => (
+                  <TouchableOpacity
+                    key={item}
+                    style={[
+                      styles.deptItem,
+                      data.department === item && styles.deptItemSelected,
+                    ]}
+                    onPress={() => {
+                      updateData({ department: item });
+                      setErrors((p) => ({ ...p, department: "" }));
+                      closeDeptModal();
+                    }}
+                  >
+                    <Text
+                      style={[
+                        styles.deptItemText,
+                        data.department === item && styles.deptItemTextSelected,
+                      ]}
+                    >
+                      {item}
+                    </Text>
+                    {data.department === item && (
+                      <Check size={18} color="#6366f1" />
+                    )}
+                  </TouchableOpacity>
+                ))
+              ) : (
+                <View style={styles.emptyBox}>
+                  <Text style={styles.emptyText}>검색 결과가 없어요</Text>
+                </View>
+              )}
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 }
@@ -446,13 +443,26 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bold,
   },
   buttonTextInactive: { color: "#aaa" },
-  bottomSheetBg: {
+  // 모달 스타일
+  modalContainer: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(0,0,0,0.4)",
+  },
+  modalContent: {
     backgroundColor: "#fff",
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
+    height: "90%",
   },
-  bottomSheetHandle: { backgroundColor: "transparent", width: 0 },
-  bottomSheetHeader: {
+  handleWrap: { alignItems: "center", paddingTop: 12, paddingBottom: 4 },
+  handle: {
+    width: 40,
+    height: 4,
+    backgroundColor: "#e5e5e5",
+    borderRadius: 2,
+  },
+  modalHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
@@ -461,7 +471,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#f0f0f0",
   },
-  bottomSheetTitle: {
+  modalTitle: {
     fontSize: 16,
     fontWeight: "700",
     color: "#111",
