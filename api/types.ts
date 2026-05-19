@@ -147,7 +147,14 @@ export interface ImageUploadResponse {
 
 // Lost Item Types
 export type ItemType = "LOST" | "FOUND";
-export type ItemStatus = "REPORTED" | "RESOLVED" | "THEFT_CONFIRMED";
+export type ItemStatus =
+  | "REPORTED"
+  | "MATCHED"
+  | "IN_LOCKER"
+  | "IN_TRANSIT"
+  | "RETRIEVING"
+  | "RETURNED"
+  | "THEFT_CONFIRMED";
 
 export interface ItemPost {
   id: number;
@@ -230,7 +237,7 @@ export interface ListMessagesResult {
 }
 
 export interface CreateChatRoomRequest {
-  item_id: number | null; // null 허용 (QR 스캔 등 item 없이 채팅 생성)
+  item_id: number | null;
   counterpart_id: number;
 }
 
@@ -264,23 +271,23 @@ export type MatchType = "LOCKER" | "CHAT";
 export interface ItemMatchResultResponse {
   score: number;
   status: MatchStatus;
-  match_id: string;
+  match_id: number; // string → number 변경
   found_item_id: number;
   found_post_id: number;
   found_post_title: string;
   found_image_url: string;
-  locationName: string;
+  location_name: string; // locationName → location_name 변경
   found_nickname: string;
   found_department: string;
-  counterpart_id: number; // 상대방(습득자) user_id
+  counterpart_id: number;
   finder_id?: number;
 }
 
-// 매칭 확정 응답 (백엔드 업데이트 예정)
-export interface ConfirmMatchResult {
+// 매칭 확정 응답 (MatchConfirmResponse 로 명세와 맞춤)
+export interface MatchConfirmResponse {
   match_id: number;
   match_type: MatchType;
-  locker_id: number | null; // LOCKER일 때만 값, CHAT은 null
+  locker_id: number | null;
   found_item_id: number;
   counterpart_id: number;
 }
