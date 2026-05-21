@@ -12,10 +12,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
   ChevronLeft,
-  ChevronRight,
-  MoreVertical,
   Package,
-  Plus,
   RefreshCw,
   Send,
   User,
@@ -485,9 +482,6 @@ export default function ChatRoomScreen() {
             <Text style={styles.reopenBtnText}>재개</Text>
           </TouchableOpacity>
         )}
-        <TouchableOpacity style={styles.moreBtn}>
-          <MoreVertical size={20} color="#555" />
-        </TouchableOpacity>
       </View>
 
       {/* 연결 상태 배너 */}
@@ -502,7 +496,6 @@ export default function ChatRoomScreen() {
           <Text style={styles.itemBannerText} numberOfLines={1}>
             {chatRoom.item_name}
           </Text>
-          <ChevronRight size={14} color="#aaa" />
         </View>
       )}
 
@@ -544,9 +537,6 @@ export default function ChatRoomScreen() {
         />
 
         <View style={[styles.inputWrap, { paddingBottom: insets.bottom + 8 }]}>
-          <TouchableOpacity style={styles.plusBtn}>
-            <Plus size={22} color="#aaa" />
-          </TouchableOpacity>
           <TextInput
             style={[styles.input, isClosed && styles.inputDisabled]}
             placeholder={
@@ -587,13 +577,17 @@ export default function ChatRoomScreen() {
                   style={styles.modalBtn}
                   onPress={() => handleClose("RETURNED", true)}
                 >
-                  <Text style={styles.modalBtnText}>📦 사물함에서 물건을 꺼낼게요</Text>
+                  <Text style={styles.modalBtnText}>
+                    📦 사물함에서 물건을 꺼낼게요
+                  </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.modalBtn}
                   onPress={() => handleClose("RETURNED", false)}
                 >
-                  <Text style={styles.modalBtnText}>🤝 직접 물건을 받았어요</Text>
+                  <Text style={styles.modalBtnText}>
+                    🤝 직접 물건을 받았어요
+                  </Text>
                 </TouchableOpacity>
               </>
             ) : (
@@ -675,12 +669,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   reopenBtnText: { fontSize: 13, fontFamily: fonts.bold, color: "#888" },
-  moreBtn: {
-    width: 32,
-    height: 32,
-    alignItems: "center",
-    justifyContent: "center",
-  },
   // 연결 상태 배너
   connectionBanner: {
     flexDirection: "row",
@@ -811,12 +799,6 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: "#f3f4f6",
     backgroundColor: "#fff",
-  },
-  plusBtn: {
-    width: 36,
-    height: 36,
-    alignItems: "center",
-    justifyContent: "center",
   },
   input: {
     flex: 1,
